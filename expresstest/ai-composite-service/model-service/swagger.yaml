@@ -1,0 +1,233 @@
+openapi: 3.0.3
+info:
+  title: AI Analysis Service
+  description: A generic AI analysis service that processes document pages using custom prompts via OpenRouter API
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@example.com
+servers:
+  - url: http://localhost:5020
+    description: Development server
+paths:
+  /analyse:
+    post:
+      summary: Analyze document pages with custom prompt
+      description: Processes multiple document pages using a custom AI prompt. This service is designed to be reusable across different use cases by accepting any prompt from the calling service.
+      tags:
+        - AI Analysis
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - prompt
+                - pages
+              properties:
+                prompt:
+                  type: string
+                  description: Custom system prompt that defines the AI's role and analysis approach
+                  example: "You are a contract analysis assistant. Identify suspicious clauses, key obligations, and potential risks."
+                pages:
+                  type: array
+                  items:
+                    type: string
+                  description: Array of document page contents to be analyzed
+                  example: 
+                    - "--- Page 1 ---\nCONTRACT AGREEMENT\n\nThis agreement is entered into between..."
+                    - "--- Page 2 ---\nTERMS AND CONDITIONS\n\n1. Payment terms: Net 30 days..."
+                    - "--- Page 3 ---\nLIABILITY CLAUSES\n\nThe contractor shall be liable for..."
+            examples:
+              contract_analysis:
+                summary: Contract Analysis
+                description: Example for analyzing contract documents
+                value:
+                  prompt: "You are a contract analysis assistant. Identify suspicious clauses, key obligations, and potential risks."
+                  pages:
+                    - "CONTRACT AGREEMENT\n\nThis agreement is entered into between Company A and Company B for the provision of consulting services..."
+                    - "PAYMENT TERMS\n\nPayment shall be made within 30 days of invoice receipt. Late payments will incur a 2% monthly penalty..."
+              document_summary:
+                summary: Document Summarization
+                description: Example for summarizing documents
+                value:
+                  prompt: "You are a document summarization assistant. Create a concise summary of the key points and main topics."
+                  pages:
+                    - "QUARTERLY REPORT\n\nThis quarter has shown significant growth in our technology sector..."
+                    - "FINANCIAL HIGHLIGHTS\n\nRevenue increased by 15% compared to last quarter..."
+              ocr_correction:
+                summary: OCR Text Correction
+                description: Example for correcting OCR errors
+                value:
+                  prompt: "You are an OCR correction assistant. Fix any OCR errors, improve text formatting, and ensure readability."
+                  pages:
+                    - "C0URSE INF0RMATI0N\n\nC0urse C0de & Title Academic Year /Term\nCS460 F0undati0ns 0f Cyber-Phy Sys..."
+              risk_assessment:
+                summary: Risk Assessment
+                description: Example for legal risk assessment
+                value:
+                  prompt: "You are a legal risk assessment assistant. Evaluate any financial or compliance risks in this document."
+                  pages:
+                    - "COMPLIANCE REQUIREMENTS\n\nAll parties must adhere to local regulations and industry standards..."
+      responses:
+        '200':
+          description: Analysis completed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                description: OpenRouter API response containing the AI analysis
+                properties:
+                  id:
+                    type: string
+                    description: Unique identifier for the completion
+                    example: "chatcmpl-123456789"
+                  object:
+                    type: string
+                    description: Object type
+                    example: "chat.completion"
+                  created:
+                    type: integer
+                    description: Unix timestamp of creation
+                    example: 1704067200
+                  model:
+                    type: string
+                    description: Model used for the completion
+                    example: "openrouter/cypher-alpha:free"
+                  choices:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        index:
+                          type: integer
+                          example: 0
+                        message:
+                          type: object
+                          properties:
+                            role:
+                              type: string
+                              example: "assistant"
+                            content:
+                              type: string
+                              description: AI analysis result
+                              example: "Based on my analysis of the contract, I've identified several key areas of concern:\n\n1. **Suspicious Clauses:**\n   - Unlimited liability clause in section 3.2\n   - Automatic renewal without notice period\n\n2. **Key Obligations:**\n   - Monthly reporting requirements\n   - Compliance with industry standards\n\n3. **Potential Risks:**\n   - Financial exposure due to unlimited liability\n   - Difficulty terminating due to auto-renewal terms"
+                        finish_reason:
+                          type: string
+                          example: "stop"
+                  usage:
+                    type: object
+                    properties:
+                      prompt_tokens:
+                        type: integer
+                        example: 150
+                      completion_tokens:
+                        type: integer
+                        example: 200
+                      total_tokens:
+                        type: integer
+                        example: 350
+              examples:
+                contract_analysis_response:
+                  summary: Contract Analysis Response
+                  description: Example response for contract analysis
+                  value:
+                    id: "chatcmpl-abc123"
+                    object: "chat.completion"
+                    created: 1704067200
+                    model: "openrouter/cypher-alpha:free"
+                    choices:
+                      - index: 0
+                        message:
+                          role: "assistant"
+                          content: "Based on my analysis of the contract, I've identified several key areas:\n\n**Suspicious Clauses:**\n- Unlimited liability clause in section 3.2\n- Vague termination conditions\n\n**Key Obligations:**\n- Monthly deliverable requirements\n- Compliance reporting\n\n**Potential Risks:**\n- Financial exposure\n- Operational constraints"
+                        finish_reason: "stop"
+                    usage:
+                      prompt_tokens: 180
+                      completion_tokens: 120
+                      total_tokens: 300
+        '400':
+          description: Bad request - missing or invalid required fields
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                missing_prompt:
+                  summary: Missing Prompt
+                  value:
+                    error: "Missing or invalid 'prompt' field"
+                missing_pages:
+                  summary: Missing Pages
+                  value:
+                    error: "Missing or invalid 'pages' field"
+                invalid_pages:
+                  summary: Invalid Pages Format
+                  value:
+                    error: "Missing or invalid 'pages' field"
+        '502':
+          description: Bad gateway - AI service request failed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "AI request failed"
+                  status:
+                    type: integer
+                    description: HTTP status code from OpenRouter API
+                    example: 429
+                  details:
+                    type: string
+                    description: Error details from OpenRouter API
+                    example: "Rate limit exceeded"
+              examples:
+                rate_limit:
+                  summary: Rate Limit Exceeded
+                  value:
+                    error: "AI request failed"
+                    status: 429
+                    details: "Rate limit exceeded"
+                api_error:
+                  summary: API Error
+                  value:
+                    error: "AI request failed"
+                    status: 500
+                    details: "Internal server error"
+  /health:
+    get:
+      summary: Health check
+      description: Returns the health status of the AI analysis service
+      tags:
+        - Health
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "healthy"
+                  service:
+                    type: string
+                    example: "ai-analysis"
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message describing what went wrong
+          example: "Missing or invalid 'prompt' field"
+tags:
+  - name: AI Analysis
+    description: Operations for analyzing documents using custom AI prompts
+  - name: Health
+    description: Service health monitoring

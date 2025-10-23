@@ -1,0 +1,224 @@
+openapi: 3.0.3
+info:
+  title: Session Management API
+  version: 1.0.0
+  description: Handles creation, retrieval, and updating of session data stored in Supabase.
+
+servers:
+  - url: http://localhost:9697
+    description: Local development server
+
+paths:
+  /add_session/{modsecyear}:
+    get:
+      summary: Create missing weekly sessions for a given modsecyear
+      parameters:
+        - name: modsecyear
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "Y2S1"
+      responses:
+        '200':
+          description: Sessions created or already existed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  new_sessions:
+                    type: array
+                    items:
+                      type: string
+                  existing_sessions:
+                    type: array
+                    items:
+                      type: string
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+
+  /update_active:
+    post:
+      summary: Updates the active session for a given modsecyear
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - modsecyear
+                - title
+                - active
+              properties:
+                modsecyear:
+                  type: string
+                  example: "Y2S1"
+                title:
+                  type: string
+                  example: "w3"
+                active:
+                  type: boolean
+                  example: true
+      responses:
+        '200':
+          description: Session status updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      type: object
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+
+  /get_active:
+    get:
+      summary: Get active session status
+      parameters:
+        - name: session_id
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: modsecyear
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: title
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Active session(s) retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      type: object
+        '400':
+          description: Missing query parameters
+        '500':
+          description: Server error
+
+  /get_session_id:
+    get:
+      summary: Retrieve session_id for a specific modsecyear and title
+      parameters:
+        - name: modsecyear
+          in: query
+          required: true
+          schema:
+            type: string
+            example: "Y2S1"
+        - name: title
+          in: query
+          required: true
+          schema:
+            type: string
+            example: "w2"
+      responses:
+        '200':
+          description: Session ID found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  session_id:
+                    type: integer
+        '400':
+          description: Missing query parameters
+        '404':
+          description: Session not found
+        '500':
+          description: Server error
+
+  /get_modsecyear:
+    get:
+      summary: Get modsecyear by session_id
+      parameters:
+        - name: session_id
+          in: query
+          required: true
+          schema:
+            type: integer
+            example: 45
+      responses:
+        '200':
+          description: modsecyear found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  modsecyear:
+                    type: string
+        '400':
+          description: Missing session_id
+        '404':
+          description: Not found
+        '500':
+          description: Server error
+
+  /get_all_title/{modsecyear}:
+    get:
+      summary: Retrieve all session titles and IDs for a modsecyear
+      parameters:
+        - name: modsecyear
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "Y2S1"
+      responses:
+        '200':
+          description: List of session titles and IDs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    title:
+                      type: string
+                    session_id:
+                      type: integer
+        '400':
+          description: Missing modsecyear
+        '404':
+          description: Not found
+        '500':
+          description: Server error

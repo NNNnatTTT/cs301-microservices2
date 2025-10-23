@@ -1,0 +1,317 @@
+openapi: 3.0.3
+info:
+  title: Analysis Results API
+  description: A REST API for managing analysis results with CRUD operations
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@example.com
+servers:
+  - url: http://localhost:5008
+    description: Development server
+paths:
+  /analyse-results:
+    post:
+      summary: Create a new analysis result
+      description: Creates a new analysis result for a specific file
+      tags:
+        - Analysis Results
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - file_id
+                - result
+              properties:
+                file_id:
+                  type: string
+                  format: uuid
+                  description: UUID of the file being analyzed
+                  example: "bb37b8a5-4aca-4f8d-a2ba-4f5938418624"
+                result:
+                  type: object
+                  description: JSON object containing analysis results
+                  example:
+                    status: "completed"
+                    confidence: 0.95
+                    analysis_type: "document_classification"
+                    categories: ["business", "report"]
+                    metadata:
+                      processing_time: 2.3
+                      model_version: "v1.2.0"
+                    findings:
+                      - type: "sentiment"
+                        value: "positive"
+                        score: 0.87
+      responses:
+        '201':
+          description: Analysis result created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Analysis result created successfully"
+                  data:
+                    $ref: '#/components/schemas/AnalysisResult'
+        '400':
+          description: Bad request - missing required fields
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    get:
+      summary: Get all analysis results
+      description: Retrieves all analysis results with optional filtering and pagination
+      tags:
+        - Analysis Results
+      parameters:
+        - name: file_id
+          in: query
+          description: Filter results by file ID
+          required: false
+          schema:
+            type: string
+            format: uuid
+            example: "bb37b8a5-4aca-4f8d-a2ba-4f5938418624"
+        - name: limit
+          in: query
+          description: Maximum number of results to return
+          required: false
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 100
+            example: 10
+        - name: offset
+          in: query
+          description: Number of results to skip for pagination
+          required: false
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+            example: 0
+      responses:
+        '200':
+          description: Analysis results retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AnalysisResult'
+                  count:
+                    type: integer
+                    description: Number of results returned
+                    example: 5
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /analyse-results/{result_id}:
+    get:
+      summary: Get a specific analysis result
+      description: Retrieves a single analysis result by its ID
+      tags:
+        - Analysis Results
+      parameters:
+        - name: result_id
+          in: path
+          required: true
+          description: UUID of the analysis result
+          schema:
+            type: string
+            format: uuid
+            example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+      responses:
+        '200':
+          description: Analysis result retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AnalysisResult'
+        '404':
+          description: Analysis result not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      summary: Update an analysis result
+      description: Updates an existing analysis result
+      tags:
+        - Analysis Results
+      parameters:
+        - name: result_id
+          in: path
+          required: true
+          description: UUID of the analysis result to update
+          schema:
+            type: string
+            format: uuid
+            example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                file_id:
+                  type: string
+                  format: uuid
+                  description: UUID of the file being analyzed
+                  example: "bb37b8a5-4aca-4f8d-a2ba-4f5938418624"
+                result:
+                  type: object
+                  description: Updated JSON object containing analysis results
+                  example:
+                    status: "updated"
+                    confidence: 0.98
+                    analysis_type: "document_classification"
+                    categories: ["business", "report", "financial"]
+      responses:
+        '200':
+          description: Analysis result updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Analysis result updated successfully"
+                  data:
+                    $ref: '#/components/schemas/AnalysisResult'
+        '400':
+          description: Bad request - no data provided or no valid fields to update
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Analysis result not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      summary: Delete an analysis result
+      description: Deletes an existing analysis result
+      tags:
+        - Analysis Results
+      parameters:
+        - name: result_id
+          in: path
+          required: true
+          description: UUID of the analysis result to delete
+          schema:
+            type: string
+            format: uuid
+            example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+      responses:
+        '200':
+          description: Analysis result deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Analysis result deleted successfully"
+        '404':
+          description: Analysis result not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    AnalysisResult:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for the analysis result
+          example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        file_id:
+          type: string
+          format: uuid
+          description: UUID of the analyzed file
+          example: "bb37b8a5-4aca-4f8d-a2ba-4f5938418624"
+        result:
+          type: object
+          description: JSON object containing the analysis results
+          example:
+            status: "completed"
+            confidence: 0.95
+            analysis_type: "document_classification"
+            categories: ["business", "report"]
+            metadata:
+              processing_time: 2.3
+              model_version: "v1.2.0"
+            findings:
+              - type: "sentiment"
+                value: "positive"
+                score: 0.87
+        created_at:
+          type: string
+          format: date-time
+          description: Timestamp when the analysis result was created
+          example: "2025-07-06T00:10:00.000Z"
+        updated_at:
+          type: string
+          format: date-time
+          description: Timestamp when the analysis result was last updated
+          example: "2025-07-06T00:15:00.000Z"
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message describing what went wrong
+          example: "file_id and result are required"
+tags:
+  - name: Analysis Results
+    description: Operations for managing analysis results

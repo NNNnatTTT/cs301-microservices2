@@ -1,0 +1,64 @@
+services:
+  db:
+    image: postgres:16
+    container_name: agentdb
+    # ports:
+    #   - "${PGPORT}:5432"
+    environment:
+      POSTGRES_USER: ${PGUSER}
+      POSTGRES_PASSWORD: ${PGPASSWORD}
+      POSTGRES_DB: ${PGDB}
+    # env_file:
+    #   - ./agent-service/.env
+    volumes:
+      # persistent data volume
+      - dbdata:/var/lib/postgresql/data
+      # init scripts (run ONCE on fresh volume)
+      - ./agent-service/docker/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PGUSER} -d ${PGDB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  
+  agent-service:
+    build:
+      context: ./agent-service
+      dockerfile: Dockerfile
+    env_file:
+      - ./agent-service/.env
+    container_name: agent-service
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgres://${PGUSER}:${PGPASSWORD}@db:5432/${PGDB}
+    depends_on:
+      db:
+        condition: service_healthy
+    # (Optional for local dev hot-reload)
+    volumes:
+      - ./agent-service:/usr/src/app
+
+  transaction-service:
+    build:
+      context: ./transaction-service
+      dockerfile: Dockerfile
+    env_file:
+      - ./transaction-service/.env
+    container_name: transaction-service
+    ports:
+      - "3001:3000"
+
+
+  # # Optional web UI to poke the DB
+  # adminer:
+  #   image: adminer
+  #   ports:
+  #     - "8080:8080"
+  #   depends_on:
+  #     - db
+
+volumes:
+  dbdata:
+
+  # docker compose down -v at the end

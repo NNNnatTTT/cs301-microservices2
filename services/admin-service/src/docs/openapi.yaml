@@ -1,0 +1,185 @@
+openapi: 3.0.3
+info:
+  title: Admin Service API
+  version: 3.0.0
+  description: >
+    Feature 1 – CRM User Management (Cognito + PostgreSQL + Prisma)
+
+    - Uses **AWS Cognito** for authentication, MFA, and OAuth 2.0 token issuance.
+    - The backend verifies Cognito JWTs for all requests (Zero Trust model).
+    - Only the **root admin** (configured via `ROOT_ADMIN_EMAIL`) can create, update, delete, or view **admin users**.
+servers:
+  - url: http://localhost:8080/api
+security:
+  - bearerAuth: []
+paths:
+  /users:
+    get:
+      summary: List users (agents only for admins; admins visible only to root admin)
+      parameters:
+        - in: query
+          name: includeAdmins
+          schema:
+            type: string
+            enum: ['true', 'false']
+          description: Include admin users (root admin only)
+      responses:
+        '200':
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: { type: string }
+                    firstName: { type: string }
+                    lastName: { type: string }
+                    email: { type: string }
+                    role: { type: string, enum: [admin, agent] }
+                    disabled: { type: boolean, example: false }
+                    deletedAt:
+                      { type: string, format: date-time, nullable: true }
+    post:
+      summary: Create user (admin or agent)
+      description: >
+        Creates a new user in AWS Cognito and mirrors them in the local DB.
+        - Only the root admin can create admin users.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                firstName: { type: string, example: 'Alice' }
+                lastName: { type: string, example: 'Tan' }
+                email: { type: string, format: email }
+                role: { type: string, enum: [admin, agent] }
+              required: [firstName, lastName, email, role]
+      responses:
+        '201': { description: User created in Cognito and database }
+  /users/{id}:
+    get:
+      summary: Get user details
+      description: >
+        Retrieves user profile info from the database.
+        Admin users are visible only to the root admin.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: User info
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+                  firstName: { type: string }
+                  lastName: { type: string }
+                  email: { type: string }
+                  role: { type: string, enum: [admin, agent] }
+                  disabled: { type: boolean, example: true }
+                  deletedAt: { type: string, format: date-time, nullable: true }
+    put:
+      summary: Update user profile
+      description: >
+        Updates first name, last name, or role.  
+        - Changing a user’s role to `admin` requires root admin privilege.  
+        - Cognito groups are synced automatically.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                firstName: { type: string }
+                lastName: { type: string }
+                role: { type: string, enum: [admin, agent] }
+      responses:
+        '200': { description: User updated successfully }
+  /users/{id}/delete:
+    patch:
+      summary: Soft delete user
+      description: >
+        Marks a user as deleted in the local DB and disables them in Cognito.  
+        - Only the root admin can delete admin users.  
+        - The root admin themselves cannot be deleted.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  example: 'User requested account closure'
+      responses:
+        '200': { description: User soft-deleted successfully }
+  /users/disable:
+    patch:
+      summary: Disable or enable a user in Cognito
+      description: >
+        Disables or enables a user account at the Cognito level.  
+        - Only the root admin can perform this action on admins.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: 'agent@bank.com'
+                disabled:
+                  type: boolean
+                  example: true
+              required: [email, disabled]
+      responses:
+        '200': { description: User status changed in Cognito }
+  /users/reset-password:
+    post:
+      summary: Admin-initiated password reset via Cognito
+      description: >
+        Sends a Cognito reset password request for the specified user.  
+        - Only the root admin can reset admin passwords.  
+        - The root admin account itself must be reset via the Cognito console.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: 'agent@bank.com'
+              required: [email]
+      responses:
+        '200': { description: Password reset initiated via Cognito }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
