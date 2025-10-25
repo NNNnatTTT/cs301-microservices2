@@ -1,7 +1,7 @@
 import express from "express";
 import helmet from "helmet";
 import pool from "./db/pool.js";
-import transactionsRouter from "./routes/transactions.js"; 
+import profilesRouter from "./routes/profiles.js"; 
 import { requireAuth } from "./middlewares/auth.js";
 
 import 'dotenv/config';
@@ -17,15 +17,15 @@ app.get("/readyz", async (_req, res) => {
   catch (e) { res.status(503).send("not ready"); console.log(e)}
 });
 app.get("/allz", async (_req, res) => {
-  try { const agents = await pool.query("SELECT * FROM transactions.transaction_list"); res.status(200).json({ agents })}
+  try { const agents = await pool.query("SELECT * FROM profiles.profile_list"); res.status(200).json({ agents })}
   catch (e) { res.status(503).send(e); console.log(e)}
 });
 
 // Root route
-app.get("/", (req, res) => res.send("API is running"));
+app.get("/", (_req, res) => res.send("API is running"));
 
 // Actual
-app.use("/v1/transactions", requireAuth, transactionsRouter);
+app.use("/v1/profile", requireAuth, profilesRouter);
 
 // Global Error Handler
 app.use((err, _req, res, _next) => {

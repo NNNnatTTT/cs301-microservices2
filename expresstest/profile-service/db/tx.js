@@ -1,0 +1,327 @@
+import pool from "./pool.js";
+
+async function isElligible({agentID, id}) {
+  console.log(agentID, id);
+  try {
+    const query = `
+      SELECT EXISTS (
+        SELECT 1 FROM profiles.profile_list WHERE id = $1 AND agent_id = $2
+        AND deleted_at IS NULL
+      ) AS eligible;
+    `;
+
+    const {rows } = await pool.query(query, [id, agentID]);
+    return !!rows[0].eligible;
+  } catch (e) {
+    console.error('Error reading agent: ', e)
+      throw e;
+  }
+}
+
+async function createProfile({firstName, lastName, dateOfBirth, gender, email, phoneNumber, 
+      address, city, state, country, postal, status, agentID }) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const insertQuery = `
+      INSERT INTO profiles.profile_list (first_name, last_name, date_of_birth, gender, email, phone_number, 
+      address, city, state, country, postal, status, agent_id)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      RETURNING id;
+    `;
+
+    const values = [firstName, lastName, dateOfBirth, gender, email, phoneNumber, 
+                    address, city, state, country, postal, status, agentID ];
+    const result = await client.query(insertQuery, values);
+
+    const profileID = result.rows[0].id;
+    
+    await client.query("COMMIT");
+    return profileID;
+  } catch (e) {
+    try { await client.query("ROLLBACK"); } catch {}
+      throw e;
+  } finally {
+    client.release();
+  }
+}
+
+// NOT FOR PROD
+async function getProfileByID({ id }) {
+  const client = await pool.connect();
+  try {
+    const selectByIDQuery = `
+      SELECT id, first_name, last_name, date_of_birth, gender, email, phone_number, 
+      address, city, state, country, postal, status, agent_id
+      FROM profiles.profile_list
+      WHERE id = $1;
+    `;
+
+    const result = await client.query(selectByIDQuery, [id]);
+    
+    return result.rows[0] || null;
+  } catch (e) {
+    console.error('Error reading agent: ', e)
+      throw e;
+  } finally {
+    client.release();
+  }
+}
+// NOT FOR PROD
+async function getAllProfiles({ id }) {
+  const client = await pool.connect();
+  try {
+    const selectByIDQuery = `
+      SELECT id, first_name, last_name, date_of_birth, gender, email, phone_number, 
+      address, city, state, country, postal, status, agent_id
+      FROM profiles.profile_list
+    `;
+
+    const {rows} = await client.query(selectByIDQuery, [id]);
+    
+    return rows || null;
+  } catch (e) {
+    console.error('Error reading agent: ', e)
+      throw e;
+  } finally {
+    client.release();
+  }
+}
+
+async function getProfileByIDagentID({id, agentID}) {
+  const client = await pool.connect();
+  try {
+    const selectByIDQuery = `
+      SELECT id, first_name, last_name, date_of_birth, gender, email, phone_number, 
+      address, city, state, country, postal, status, agent_id
+      FROM profiles.profile_list
+      WHERE id = $1 AND agent_id = $2;
+    `;
+
+    const result = await client.query(selectByIDQuery, [id, agentID]);
+    
+    return result.rows[0] || null;
+  } catch (e) {
+    console.error('Error reading agent: ', e)
+      throw e;
+  } finally {
+    client.release();
+  }
+}
+
+async function getProfilePagesByAgentID({agentID, limit, offset}) {
+  const client = await pool.connect();
+  try {
+    const selectByIDQuery = `
+      SELECT id, first_name, last_name, date_of_birth, gender, email, phone_number, 
+      address, city, state, country, postal, status, agent_id
+      FROM profiles.profile_list
+      WHERE agent_id = $1 AND deleted_at IS NULL
+      ORDER BY created_at DESC, agent_id DESC
+      LIMIT $2 OFFSET $3;
+    `;
+
+    const {rows} = await client.query(selectByIDQuery, [agentID, limit, offset]);
+    
+    return rows || null;
+  } catch (e) {
+    console.error('Error reading agent: ', e)
+      throw e;
+  } finally {
+    client.release();
+  }
+}
+
+async function getProfilePagesByName({agentID, nameValue, limit, offset}) {
+
+}
+async function getProfilePagesByDOB({agentID, dateOfBirth, limit, offset}) {
+
+}
+async function getProfilePagesByGender({agentID, gender, limit, offset}) {
+
+}
+async function getProfilePagesByEmail({agentID, email, limit, offset}) {
+
+}
+async function getProfilePagesByPhoneNumber({agentID, phoneNumber, limit, offset}) {
+
+}
+async function getProfilePagesByAddress({agentID, address, limit, offset}) {
+
+}
+async function getProfilesPagesBycity({agentID, city, limit, offset}) {
+  try {
+    const selectByTIDQuery = `
+      SELECT id, first_name, last_name, date_of_birth, gender, email, phone_number, 
+      address, city, state, country, postal, status, agent_id
+      FROM profiles.profile_list
+      WHERE agent_id = $1 AND city = $2 
+      ORDER BY date DESC
+      LIMIT $3 OFFSET $4;
+    `;
+  }catch (e) {
+
+  } finally {
+
+  }
+}
+async function getProfilesPagesBystate({agentID, state, limit, offset}) {
+
+}
+async function getProfilePagesBycountry({agentID, country, limit, offset}) {
+
+}
+async function getProfilePagesByPostal({agentID, postal, limit, offset}) {
+
+}
+async function getProfilePagesByStatus({agentID, status, limit, offset}) {
+
+}
+async function searchProfile ({agentID, searchValue, limit, offset}) {
+  const client = await pool.connect();
+  try {
+    console.log(searchValue);
+    // No DOB, gender or status
+    const searchQuery = `
+      SELECT id, first_name, last_name, date_of_birth, gender, email, phone_number, 
+      address, city, state, country, postal, status, agent_id
+      FROM profiles.profile_list
+      WHERE agent_id = $2
+        AND deleted_at IS NULL AND (
+              (first_name       ILIKE $1::text)
+          OR (last_name         ILIKE $1::text)
+          OR (email             ILIKE $1::citext)
+          OR translate(phone_number, ' -', '') ILIKE '%' || translate($1::text, ' -', '') || '%'
+          OR (address           ILIKE $1::text)
+          OR (city              ILIKE $1::text)
+          OR (state             ILIKE $1::text)
+          OR (country           ILIKE $1::text)
+          OR (postal            ILIKE $1::text)
+        )
+      ORDER BY created_at DESC, agent_id DESC
+      LIMIT $3 OFFSET $4;
+    `;
+    // ORDER BY created_at DESC, agent_id DESC LIMIT 10;
+
+
+    const { rows } = await client.query(searchQuery, [
+      searchValue ? `%${searchValue}%` : null,
+      agentID, limit, offset
+    ]);
+    console.log(rows);
+    return rows || null;
+  } catch (e) {
+    console.error('Error reading agent: ', e)
+      throw e;
+  } finally {
+    client.release();
+  }
+}
+
+async function updateProfile({ id, firstName, lastName, dateOfBirth, gender, email, phoneNumber, 
+      address, city, state, country, postal, status, newAgentID, agentID}) {
+  const client = await pool.connect();
+  try {
+    const ok = await isElligible({ agentID, id});
+    if (!ok) throw new Error('Not Elligible');
+    
+    const fields = [];
+    const values = [];
+    let i = 2;
+
+    const push = (sqlFragment, value) => {
+      fields.push(`${sqlFragment} $${++i}`);
+      values.push(value);
+    };
+
+    if (firstName !== undefined) push('first_name =', firstName);
+    if (lastName  !== undefined) push('last_Name =',  lastName);
+    if (dateOfBirth  !== undefined) push('date_of_birth =',  dateOfBirth);
+    if (gender  !== undefined) push('gender =',  gender);
+    if (email     !== undefined) push('email =',      email);
+    if (phoneNumber  !== undefined) push('phone_number =',  phoneNumber);
+    if (address  !== undefined) push('address =',  address);
+    if (city  !== undefined) push('city =',  city);
+    if (state  !== undefined) push('state =',  state);
+    if (country  !== undefined) push('country =',  country);
+    if (postal  !== undefined) push('postal =',  postal);
+    if (status  !== undefined) push('status =',  status);
+    if (newAgentID  !== undefined) push('agent_id =',  newAgentID);
+
+    if (fields.length === 0) {
+      // nothing to update
+      // await client.query('ROLLBACK');
+      return null;
+    } 
+
+    const params = [id, agentID, ...values];
+
+    await client.query('BEGIN');
+    const sql = `
+      UPDATE profiles.profile_list
+      SET ${fields.join(', ')},
+          updated_at = now()
+      WHERE id = $1
+        AND agent_id = $2
+        AND deleted_at IS NULL
+      RETURNING id, first_name, last_name, date_of_birth, gender, email, phone_number, 
+      address, city, state, country, postal, status, agent_id, updated_at;
+    `;
+
+    const result = await client.query(sql, params);
+    if (result.rowCount === 0) {
+      throw new Error('No rows affected');
+    }
+    await client.query("COMMIT");
+    return result.rows[0] || null;
+  } catch (e) {
+    try { await client.query("ROLLBACK"); } catch {}
+      throw e;
+  } finally {
+    client.release();
+  }
+}
+
+async function softDeleteProfile({id, agentID, deleteReason}) {
+  const client = await pool.connect();
+  try {
+    const ok = await isElligible({ id, agentID, client});
+    if (!ok) throw new Error('Not Elligible');
+    const sql = `
+      UPDATE profiles.profile_list
+      SET deleted_by = $2, deleted_at = now(), updated_at = now(), delete_reason = $3
+      WHERE id = $1
+        AND agent_id = $2
+        AND deleted_at IS NULL
+      RETURNING id, deleted_at
+    `;
+    await client.query('BEGIN');
+    const result = await client.query(sql, [id, agentID, deleteReason]);
+
+    if (result.rowCount === 0) {
+      throw new Error('Soft delete failed, not found ');
+    }
+    await client.query("COMMIT");
+    return result.rows[0];
+  } catch (e) {
+    try { await client.query("ROLLBACK"); } catch {}
+      throw e;
+  } finally {
+    client.release();
+  }
+}
+
+
+
+
+// CommonJS: module.exports = {}
+// ESM: export {}
+export { createProfile,
+        getProfileByID, getAllProfiles, 
+        getProfileByIDagentID, getProfilePagesByAgentID,
+        searchProfile,
+        updateProfile, 
+        softDeleteProfile, 
+      };

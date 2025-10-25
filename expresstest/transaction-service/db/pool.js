@@ -5,7 +5,7 @@ const { Pool } = pg;
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   // ssl: process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : false,
-  options: '-c search_path=agents,public',
+  options: '-c search_path=transactions,public',
 });
 
 export default pool;
@@ -28,7 +28,8 @@ export default pool;
 //   transaction      ENUM('D', 'W')                          NOT NULL,
 //   amount           DECIMAL                                 NOT NULL,
 //   date             timestamptz                             NOT NULL DEFAULT now(),
-//   status           ENUM('Completed', 'Pending','Failed') NOT NULL,
+//   status           ENUM('Completed', 'Pending','Failed')   NOT NULL,
+//   created_at       timestamptz                             NOT NULL DEFAULT now()
 // );
 
 // -- Indexes:

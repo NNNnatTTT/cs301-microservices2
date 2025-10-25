@@ -2,35 +2,42 @@ import { z } from "zod";
 
 const uuid = z.string().uuid();
 
+// export const bodyClientID = z.object({
+//   clientID: z.coerce.string().uuid().min(1, "clientID is required"),
+// });
+
 export const createTransactionSchema = z.object({
-  batchID: uuid,
-  clientID: uuid,
-  transaction: z.literal(["D", "W"]),
-  amount: z.decimal().trim().min(0),
-  status: z.literal(["Complete", "Pending", "Failed"  ]), 
+  batchID: z.coerce.string().uuid().min(1, "batchID is required"),
+  clientID: z.coerce.string().uuid().min(1, "clientID is required"),
+  transaction: z.enum(["D", "W"]),
+  amount: z.string()
+  .transform(val => Number(val))
+  .refine(val => !isNaN(val) && val >= 0),
+  status: z.enum(["Complete", "Pending", "Failed"  ]), 
 });
 
 export const getByTIDSchema = z.object({
-  id: uuid,
+  id: z.coerce.string().uuid().min(1, "transactionID is required"),
+  clientID: z.coerce.string().uuid().min(1, "clientID is required"),
   offset: z.coerce.number().int().min(0).default(0),
   limit: z.coerce.number().int().min(1).max(40).default(20),
 });
 
 export const getByBIDSchema = z.object({
-  batchID: uuid,
+  batchID: z.coerce.string().uuid().min(1, "batchID is required"),
   offset: z.coerce.number().int().min(0).default(0),
   limit: z.coerce.number().int().min(1).max(40).default(20),
 });
 
 export const getByClientSchema = z.object({
-  clientID: uuid,
+  clientID: z.coerce.string().uuid().min(1, "clientID is required"),
   offset: z.coerce.number().int().min(0).default(0),
   limit: z.coerce.number().int().min(1).max(40).default(20),
 });
 
 export const getByClientFilterTypeSchema = z.object({
-  clientID: uuid,
-  transaction: z.literal(["D", "W"]),
+  clientID: z.coerce.string().uuid().min(1, "clientID is required"),
+  transaction: z.enum(["D", "W"]).optional(),
   offset: z.coerce.number().int().min(0).default(0),
   limit: z.coerce.number().int().min(1).max(40).default(20),
 });

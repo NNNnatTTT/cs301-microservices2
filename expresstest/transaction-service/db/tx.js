@@ -1,14 +1,14 @@
 import pool from "./pool.js";
 
-async function isElligible({clientID}) {
+async function isEligible({clientID, id, client}) {
   try {
     const query = `
       SELECT EXISTS (
-        SELECT 1 FROM transaction.transactions_list WHERE client_id = $1
+        SELECT 1 FROM transactions.transaction_list WHERE id = $1 AND client_id = $2
       ) AS eligible;
     `;
 
-    const {rows } = await client.query(query, [clientID]);
+    const {rows } = await client.query(query, [id, clientID]);
     return !!rows[0].eligible;
   } catch (e) {
     console.error('Error reading transaction: ', e)
@@ -16,24 +16,24 @@ async function isElligible({clientID}) {
   }
 }
 
-async function createTransaction({ id, batchID, clientID, transaction, amount, status }) {
+async function createTransaction({ batchID, clientID, transaction, amount, status }) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
     const insertQuery = `
-      INSERT INTO transactions.transaction_list (id, batch_id, client_id, transaction, amount, status)
-      VALUES ($1, $2, $3, $4, $5, $6)
+      INSERT INTO transactions.transaction_list (batch_id, client_id, transaction, amount, status)
+      VALUES ($1, $2, $3, $4, $5)
       RETURNING id;
     `;
 
-    const values = [id, batchID, clientID, transaction, amount, status];
+    const values = [batchID, clientID, transaction, amount, status];
     const result = await client.query(insertQuery, values);
 
-    const agentId = result.rows[0].id;
+    const transactionID = result.rows[0].id;
     
     await client.query("COMMIT");
-    return agentId;
+    return transactionID;
   } catch (e) {
     try { await client.query("ROLLBACK"); } catch {}
       throw e;
@@ -46,16 +46,18 @@ async function createTransaction({ id, batchID, clientID, transaction, amount, s
 async function getTransactionByTID({ id, clientID }) {
   const client = await pool.connect();
   try {
-    if (!(await isElligible(clientID))) throw new Error ('Not Elligible') ;
+    // if (!(await isElligible(clientID, id, client))) throw new Error ('Not Elligible') ;
+    const ok = await isEligible({ id, clientID, client });
+    if (!ok) throw new Error("Not Elligible");
     const selectByIDQuery = `
       SELECT id, batch_id, client_id, transaction, amount, date, status
       FROM transactions.transaction_list
       WHERE id = $1;
     `;
 
-    const result = await client.query(selectByIDQuery, [id]);
+    const {rows} = await client.query(selectByIDQuery, [id]);
     
-    return result.rows[0] || null;
+    return rows[0] || null;
   } catch (e) {
     console.error('Error reading agent: ', e)
       throw e;

@@ -21,7 +21,7 @@ router.post ("/createTransaction", requireAuth, validate(schema.createTransactio
 });
 
 // /:agentID for param, otherwise blank for query
-router.get ("/findByTID", requireAuth, validateQuery(schema.agentIdParams), async(req, res, next) => {
+router.get ("/findByTID", requireAuth, validateQuery(schema.getByTIDSchema), async(req, res, next) => {
   try {
       // const adminID = req.user?.id;
       // const agentID = 
@@ -30,12 +30,13 @@ router.get ("/findByTID", requireAuth, validateQuery(schema.agentIdParams), asyn
       //   return res.status(403).json({ error: "Forbidden", message: "Missing adminID" });
       // }
 
-      const agent = await transactionTX.getTransactionByTID({
-        ...req.validated, 
+      const transaction = await transactionTX.getTransactionByTID({
+        ...req.validatedQuery, 
+        // ...req.validated,
       });
 
-      if (!agent) return res.status(404).json({ error: "NotFound" });
-      return res.status(201).json({ agent });
+      if (!transaction) return res.status(404).json({ error: "NotFound" });
+      return res.status(201).json({ transaction });
     } catch (e) {
       next(e)
     }
@@ -49,8 +50,8 @@ router.get ("/findByBID", requireAuth, validateQuery(schema.getByBIDSchema), asy
         return res.status(403).json({ error: "Forbidden", message: "Missing adminID" });
       }
 
-      const transactions = await transactionTX.getTransactionByBID({
-        ...req.validated,
+      const transactions = await transactionTX.getTransactionsByBID({
+        ...req.validatedQuery,
       });
 
       if (!transactions || transactions.length === 0) return res.status(404).json({ error: "NotFound" });
@@ -63,7 +64,7 @@ router.get ("/findByBID", requireAuth, validateQuery(schema.getByBIDSchema), asy
 router.get("/findByClient", requireAuth, validateQuery(schema.getByClientSchema), async(req, res, next) => {
   try{
     const transactions = await transactionTX.getTransactionsByClientID({
-        ...req.validated,
+        ...req.validatedQuery,
       });
 
       if (!transactions || transactions.length === 0) return res.status(404).json({ error: "NotFound" });
@@ -76,7 +77,7 @@ router.get("/findByClient", requireAuth, validateQuery(schema.getByClientSchema)
 router.get("/filterByType", requireAuth, validateQuery(schema.getByClientFilterTypeSchema), async(req, res, next) => {
   try{
     const transactions = await transactionTX.getTransactionsByClientIDFilterType({
-        ...req.validated,
+        ...req.validatedQuery,
       });
 
       if (!transactions || transactions.length === 0) return res.status(404).json({ error: "NotFound" });
