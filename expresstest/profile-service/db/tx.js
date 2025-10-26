@@ -133,52 +133,7 @@ async function getProfilePagesByAgentID({agentID, limit, offset}) {
   }
 }
 
-async function getProfilePagesByName({agentID, nameValue, limit, offset}) {
 
-}
-async function getProfilePagesByDOB({agentID, dateOfBirth, limit, offset}) {
-
-}
-async function getProfilePagesByGender({agentID, gender, limit, offset}) {
-
-}
-async function getProfilePagesByEmail({agentID, email, limit, offset}) {
-
-}
-async function getProfilePagesByPhoneNumber({agentID, phoneNumber, limit, offset}) {
-
-}
-async function getProfilePagesByAddress({agentID, address, limit, offset}) {
-
-}
-async function getProfilesPagesBycity({agentID, city, limit, offset}) {
-  try {
-    const selectByTIDQuery = `
-      SELECT id, first_name, last_name, date_of_birth, gender, email, phone_number, 
-      address, city, state, country, postal, status, agent_id
-      FROM profiles.profile_list
-      WHERE agent_id = $1 AND city = $2 
-      ORDER BY date DESC
-      LIMIT $3 OFFSET $4;
-    `;
-  }catch (e) {
-
-  } finally {
-
-  }
-}
-async function getProfilesPagesBystate({agentID, state, limit, offset}) {
-
-}
-async function getProfilePagesBycountry({agentID, country, limit, offset}) {
-
-}
-async function getProfilePagesByPostal({agentID, postal, limit, offset}) {
-
-}
-async function getProfilePagesByStatus({agentID, status, limit, offset}) {
-
-}
 async function searchProfile ({agentID, searchValue, limit, offset}) {
   const client = await pool.connect();
   try {
