@@ -5,7 +5,7 @@ async function isElligible({agentID, id}) {
   try {
     const query = `
       SELECT EXISTS (
-        SELECT 1 FROM profiles.profile_list WHERE id = $1 AND agent_id = $2
+        SELECT 1 FROM requests.request_list WHERE id = $1 AND agent_id = $2
         AND deleted_at IS NULL
       ) AS eligible;
     `;
@@ -18,21 +18,18 @@ async function isElligible({agentID, id}) {
   }
 }
 
-async function createProfile({firstName, lastName, dateOfBirth, gender, email, phoneNumber, 
-      address, city, state, country, postal, status, agentID }) {
+async function createRequest({entity_id, supportingDocs, agentID}) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
     const insertQuery = `
-      INSERT INTO profiles.profile_list (first_name, last_name, date_of_birth, gender, email, phone_number, 
-      address, city, state, country, postal, status, agent_id)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      INSERT INTO requests.request_list (entity_id, supportingDocs, submitted_by)
+      VALUES ($1, $2, $3)
       RETURNING id;
     `;
 
-    const values = [firstName, lastName, dateOfBirth, gender, email, phoneNumber, 
-                    address, city, state, country, postal, status, agentID ];
+    const values = [entity_id, supportingDocs, agentID];
     const result = await client.query(insertQuery, values);
 
     const profileID = result.rows[0].id;
@@ -89,14 +86,13 @@ async function getAllProfiles({ id }) {
   }
 }
 
-async function getProfileByIDagentID({id, agentID}) {
+async function getRequestByIDagentID({id, agentID}) {
   const client = await pool.connect();
   try {
     const selectByIDQuery = `
-      SELECT id, first_name, last_name, date_of_birth, gender, email, phone_number, 
-      address, city, state, country, postal, status, agent_id
-      FROM profiles.profile_list
-      WHERE id = $1 AND agent_id = $2;
+      SELECT id, entity_id, supporting_docs, subnmitted_at, submitted_by, verified_at, verified_by, rejected_at, rejected_by, reject_reason
+      FROM reqeusts.request_list
+      WHERE id = $1 AND submitted_by = $2;
     `;
 
     const result = await client.query(selectByIDQuery, [id, agentID]);
@@ -110,14 +106,13 @@ async function getProfileByIDagentID({id, agentID}) {
   }
 }
 
-async function getProfilePagesByAgentID({agentID, limit, offset}) {
+async function getRequestPagesByAgentID({agentID, limit, offset}) {
   const client = await pool.connect();
   try {
     const selectByIDQuery = `
-      SELECT id, first_name, last_name, date_of_birth, gender, email, phone_number, 
-      address, city, state, country, postal, status, agent_id
-      FROM profiles.profile_list
-      WHERE agent_id = $1 AND deleted_at IS NULL
+      SELECT id, entity_id, supporting_docs, subnmitted_at, submitted_by, verified_at, verified_by, rejected_at, rejected_by, reject_reason
+      FROM reqeusts.request_list
+      WHERE submitted_by = $1
       ORDER BY created_at DESC, agent_id DESC
       LIMIT $2 OFFSET $3;
     `;
@@ -175,8 +170,7 @@ async function searchProfile ({agentID, searchValue, limit, offset}) {
   }
 }
 
-async function updateProfile({ id, firstName, lastName, dateOfBirth, gender, email, phoneNumber, 
-      address, city, state, country, postal, status, newAgentID, agentID}) {
+async function verifyRequest({id, supportingDocs, verifiedAt, verifiedBy, agentID}) {
   const client = await pool.connect();
   try {
     const ok = await isElligible({ agentID, id});
@@ -191,19 +185,9 @@ async function updateProfile({ id, firstName, lastName, dateOfBirth, gender, ema
       values.push(value);
     };
 
-    if (firstName !== undefined) push('first_name =', firstName);
-    if (lastName  !== undefined) push('last_Name =',  lastName);
-    if (dateOfBirth  !== undefined) push('date_of_birth =',  dateOfBirth);
-    if (gender  !== undefined) push('gender =',  gender);
-    if (email     !== undefined) push('email =',      email);
-    if (phoneNumber  !== undefined) push('phone_number =',  phoneNumber);
-    if (address  !== undefined) push('address =',  address);
-    if (city  !== undefined) push('city =',  city);
-    if (state  !== undefined) push('state =',  state);
-    if (country  !== undefined) push('country =',  country);
-    if (postal  !== undefined) push('postal =',  postal);
-    if (status  !== undefined) push('status =',  status);
-    if (newAgentID  !== undefined) push('agent_id =',  newAgentID);
+    if (supportingDocs  !== undefined) push('last_Name =',  supportingDocs);
+    if (verifiedAt     !== undefined) push('email =',      verifiedAt);
+    if (verifiedBy  !== undefined) push('phone_number =',  verifiedBy);
 
     if (fields.length === 0) {
       // nothing to update
@@ -219,10 +203,117 @@ async function updateProfile({ id, firstName, lastName, dateOfBirth, gender, ema
       SET ${fields.join(', ')},
           updated_at = now()
       WHERE id = $1
-        AND agent_id = $2
-        AND deleted_at IS NULL
-      RETURNING id, first_name, last_name, date_of_birth, gender, email, phone_number, 
-      address, city, state, country, postal, status, agent_id, updated_at;
+        AND submitted_by = $2
+      RETURNING id, entity_id, supporting_docs, subnmitted_at, submitted_by, verified_at, verified_by, rejected_at, rejected_by, reject_reason;
+    `;
+
+    const result = await client.query(sql, params);
+    if (result.rowCount === 0) {
+      throw new Error('No rows affected');
+    }
+    await client.query("COMMIT");
+    return result.rows[0] || null;
+  } catch (e) {
+    try { await client.query("ROLLBACK"); } catch {}
+      throw e;
+  } finally {
+    client.release();
+  }
+}
+
+async function rejectRequest({id, supportingDocs, rejectedAt, rejectedBy, rejectReason, agentID}) {
+  const client = await pool.connect();
+  try {
+    const ok = await isElligible({ agentID, id});
+    if (!ok) throw new Error('Not Elligible');
+    
+    const fields = [];
+    const values = [];
+    let i = 2;
+
+    const push = (sqlFragment, value) => {
+      fields.push(`${sqlFragment} $${++i}`);
+      values.push(value);
+    };
+
+    if (supportingDocs  !== undefined) push('last_Name =',  supportingDocs);
+    if (rejectedAt  !== undefined) push('address =',  rejectedAt);
+    if (rejectedBy  !== undefined) push('city =',  rejectedBy);
+    if (rejectReason  !== undefined) push('state =',  rejectReason);
+
+    if (fields.length === 0) {
+      // nothing to update
+      // await client.query('ROLLBACK');
+      return null;
+    } 
+
+    const params = [id, agentID, ...values];
+
+    await client.query('BEGIN');
+    const sql = `
+      UPDATE requests.request_list
+      SET ${fields.join(', ')},
+          updated_at = now()
+      WHERE id = $1
+        AND submitted_by = $2
+      RETURNING id, entity_id, supporting_docs, subnmitted_at, submitted_by, verified_at, verified_by, rejected_at, rejected_by, reject_reason;
+    `;
+
+    const result = await client.query(sql, params);
+    if (result.rowCount === 0) {
+      throw new Error('No rows affected');
+    }
+    await client.query("COMMIT");
+    return result.rows[0] || null;
+  } catch (e) {
+    try { await client.query("ROLLBACK"); } catch {}
+      throw e;
+  } finally {
+    client.release();
+  }
+}
+
+async function updateRequest({ id, entityID, supportingDocs, subnmittedAt, submittedBy, verifiedAt, verifiedBy, rejectedAt, rejectedBy, rejectReason, agentID}) {
+  const client = await pool.connect();
+  try {
+    const ok = await isElligible({ agentID, id});
+    if (!ok) throw new Error('Not Elligible');
+    
+    const fields = [];
+    const values = [];
+    let i = 2;
+
+    const push = (sqlFragment, value) => {
+      fields.push(`${sqlFragment} $${++i}`);
+      values.push(value);
+    };
+
+    if (entityID !== undefined) push('first_name =', entityID);
+    if (supportingDocs  !== undefined) push('last_Name =',  supportingDocs);
+    if (subnmittedAt  !== undefined) push('date_of_birth =',  subnmittedAt);
+    if (submittedBy  !== undefined) push('gender =',  submittedBy);
+    if (verifiedAt     !== undefined) push('email =',      verifiedAt);
+    if (verifiedBy  !== undefined) push('phone_number =',  verifiedBy);
+    if (rejectedAt  !== undefined) push('address =',  rejectedAt);
+    if (rejectedBy  !== undefined) push('city =',  rejectedBy);
+    if (rejectReason  !== undefined) push('state =',  rejectReason);
+
+    if (fields.length === 0) {
+      // nothing to update
+      // await client.query('ROLLBACK');
+      return null;
+    } 
+
+    const params = [id, agentID, ...values];
+
+    await client.query('BEGIN');
+    const sql = `
+      UPDATE profiles.profile_list
+      SET ${fields.join(', ')},
+          updated_at = now()
+      WHERE id = $1
+        AND submitted_by = $2
+      RETURNING id, entity_id, supporting_docs, subnmitted_at, submitted_by, verified_at, verified_by, rejected_at, rejected_by, reject_reason;
     `;
 
     const result = await client.query(sql, params);
@@ -303,10 +394,17 @@ async function softDeleteProfile({id, agentID, deleteReason}) {
 
 // CommonJS: module.exports = {}
 // ESM: export {}
-export { createProfile,
-        getProfileByID, getAllProfiles, 
-        getProfileByIDagentID, getProfilePagesByAgentID,
-        searchProfile,
-        updateProfile, verifyProfile,
-        softDeleteProfile, 
+// export { createProfile,
+//         getProfileByID, getAllProfiles, 
+//         getProfileByIDagentID, getProfilePagesByAgentID,
+//         searchProfile,
+//         updateProfile, verifyProfile,
+//         softDeleteProfile, 
+//       };
+
+export { createRequest,
+        // getProfileByID, getAllProfiles, 
+        getRequestByIDagentID, getRequestPagesByAgentID,
+        updateRequest, verifyRequest, rejectRequest, 
       };
+

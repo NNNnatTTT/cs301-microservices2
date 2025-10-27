@@ -5,6 +5,7 @@
   "main": "server.js",
   "scripts": {
     "dev": "node --watch server.js",
+    "allDeps": "npm install @aws-sdk/client-sqs cors dotenv express helmet jsonwebtoken pg zod",
     "start": "node server.js"
   },
   "dependencies": {

@@ -185,6 +185,26 @@ router.put ("/updateProfile", requireAuth, validateQuery(schema.paramID), valida
     }
 });
 
+router.put ("/verifyProfile", requireAuth, validateQuery(schema.paramID), async(req, res, next) => {
+  try {
+      const agentID = req.user?.id;
+      const id = req.validatedQuery.id;
+
+      if (!agentID) {
+        return res.status(403).json({ error: "Forbidden", message: "Missing agentID" });
+      }
+
+      const profileID = await profileTX.updateProfile({
+        agentID,
+        id
+      });
+
+      return res.status(201).json({ profileID });
+    } catch (e) {
+      next(e)
+    }
+});
+
 router.delete ("/deleteProfile", requireAuth, validateQuery(schema.paramID), validate(schema.softDeleteSchema), async(req, res, next) => {
   try {
       const agentID = req.user?.id;
@@ -194,13 +214,13 @@ router.delete ("/deleteProfile", requireAuth, validateQuery(schema.paramID), val
         return res.status(403).json({ error: "Forbidden", message: "Missing agentID" });
       }
 
-      const clientIDRes = await profileTX.softDeleteProfile({
+      const profileIDRes = await profileTX.softDeleteProfile({
         ...req.validated, 
         agentID,
         id
       });
 
-      return res.status(201).json({ clientIDRes });
+      return res.status(201).json({ profileIDRes });
     } catch (e) {
       next(e)
     }

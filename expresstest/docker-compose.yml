@@ -38,22 +38,39 @@ services:
   #     timeout: 3s
   #     retries: 20
 
-  transaction-db:
+  account-db:
     image: postgres:16
-    container_name: transactiondb
+    container_name: accountdb
     environment:
-      POSTGRES_USER: ${TRANSACTION_PGUSER}
-      POSTGRES_PASSWORD: ${TRANSACTION_PGPASSWORD}
-      POSTGRES_DB: ${TRANSACTION_PGDB}
+      POSTGRES_USER: ${ACCOUNT_PGUSER}
+      POSTGRES_PASSWORD: ${ACCOUNT_PGPASSWORD}
+      POSTGRES_DB: ${ACCOUNT_PGDB}
     volumes:
-      - transaction_dbdata:/var/lib/postgresql/data
-      # seed data for transaction service (optional)
-      - ./transaction-service/docker/init:/docker-entrypoint-initdb.d:ro
+      - account_dbdata:/var/lib/postgresql/data
+      # seed data for account service (optional)
+      - ./account-service/docker/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${TRANSACTION_PGUSER} -d ${TRANSACTION_PGDB}"]
+      test: ["CMD-SHELL", "pg_isready -U ${ACCOUNT_PGUSER} -d ${ACCOUNT_PGDB}"]
       interval: 5s
       timeout: 3s
       retries: 20
+
+  # transaction-db:
+  #   image: postgres:16
+  #   container_name: transactiondb
+  #   environment:
+  #     POSTGRES_USER: ${TRANSACTION_PGUSER}
+  #     POSTGRES_PASSWORD: ${TRANSACTION_PGPASSWORD}
+  #     POSTGRES_DB: ${TRANSACTION_PGDB}
+  #   volumes:
+  #     - transaction_dbdata:/var/lib/postgresql/data
+  #     # seed data for transaction service (optional)
+  #     - ./transaction-service/docker/init:/docker-entrypoint-initdb.d:ro
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U ${TRANSACTION_PGUSER} -d ${TRANSACTION_PGDB}"]
+  #     interval: 5s
+  #     timeout: 3s
+  #     retries: 20
 
 
   
@@ -92,22 +109,22 @@ services:
   #   volumes:
   #     - ./profile-service:/usr/src/app
 
-  transaction-service:
+  account-service:
     build:
-      context: ./transaction-service
+      context: ./account-service
       dockerfile: Dockerfile
     env_file:
-      - ./transaction-service/.env
-    container_name: transaction-service
+      - ./account-service/.env
+    container_name: account-service
     ports:
-      - "3002:3000"
+      - "3003:3000"
     environment:
-      DATABASE_URL: postgres://${TRANSACTION_PGUSER}:${TRANSACTION_PGPASSWORD}@TRANSACTION-db:5432/${TRANSACTION_PGDB}
+      DATABASE_URL: postgres://${ACCOUNT_PGUSER}:${ACCOUNT_PGPASSWORD}@ACCOUNT-db:5432/${ACCOUNT_PGDB}
     depends_on:
-      transaction-db:
+      account-db:
         condition: service_healthy
     volumes:
-      - ./transaction-service:/usr/src/app
+      - ./account-service:/usr/src/app
 
   # transaction-service:
   #   build:
@@ -117,7 +134,14 @@ services:
   #     - ./transaction-service/.env
   #   container_name: transaction-service
   #   ports:
-  #     - "3001:3000"
+  #     - "3002:3000"
+  #   environment:
+  #     DATABASE_URL: postgres://${TRANSACTION_PGUSER}:${TRANSACTION_PGPASSWORD}@TRANSACTION-db:5432/${TRANSACTION_PGDB}
+  #   depends_on:
+  #     transaction-db:
+  #       condition: service_healthy
+  #   volumes:
+  #     - ./transaction-service:/usr/src/app
 
 
   # # Optional web UI to poke the DB
@@ -130,7 +154,8 @@ services:
 
 volumes:
   # dbdata:
-  profile_dbdata:
-  transaction_dbdata:
+  # profile_dbdata:
+  # transaction_dbdata:
+  account_dbdata:
 
   # docker compose down -v at the end

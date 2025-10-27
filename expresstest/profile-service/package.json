@@ -5,6 +5,7 @@
   "main": "server.js",
   "scripts": {
     "dev": "node --watch server.js",
+    "allDeps": "npm install @aws-sdk/client-sqs cors dotenv express helmet jsonwebtoken pg zod",
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js"
   },
