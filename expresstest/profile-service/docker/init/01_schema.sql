@@ -18,6 +18,10 @@ BEGIN
 END$$;
 
 -- Profiles table
+-- CREATE TABLE IF NOT EXISTS profile_media_table(
+--   id                uuid                FOREIGN KEY,
+--   media_id          uuid                NOT NULL,
+-- );
 CREATE TABLE IF NOT EXISTS profile_list (
   id                 uuid                PRIMARY KEY DEFAULT gen_random_uuid(),
   first_name         text                NOT NULL,
