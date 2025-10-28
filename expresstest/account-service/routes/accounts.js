@@ -221,6 +221,30 @@ router.put ("/updateAccount", requireAuth, validateQuery(schema.paramID), valida
     }
 });
 
+router.put ("/verifyAccount", requireAuth, validateQuery(schema.paramID), async(req, res, next) => {
+  try {
+    const agentID = req.user?.id;
+    const role = req.user?.role;
+    const id = req.validatedQuery.id;
+
+    if (!agentID) {
+        return res.status(403).json({ error: "Forbidden", message: "Missing agentID" });
+    } 
+    if (role != "agent") {
+        return res.status(403).json({ error: "Forbidden", message: "Not agent" });
+    }
+
+      const client = await accountTX.verifyAccount({
+        agentID,
+        id
+      });
+
+      return res.status(200).json({ client });
+  } catch (e) {
+    next(e)
+  }
+});
+
 router.delete ("/deleteAccount", requireAuth, validateQuery(schema.paramID), validate(schema.softDeleteSchema), async(req, res, next) => {
   try {
       const agentID = req.user?.id;
@@ -241,5 +265,26 @@ router.delete ("/deleteAccount", requireAuth, validateQuery(schema.paramID), val
       next(e)
     }
 });
+
+// router.delete ("/PermDeleteAccount", requireAuth, validateQuery(schema.paramID), async(req, res, next) => {
+//   try {
+//       const agentID = req.user?.id;
+//       const id = req.validatedQuery.id;
+
+//       if (!agentID) {
+//         return res.status(403).json({ error: "Forbidden", message: "Missing agentID" });
+//       }
+
+//       const clientIDRes = await accountTX.hardDeleteAccount({
+//         ...req.validated, 
+//         agentID,
+//         id
+//       });
+
+//       return res.status(201).json({ clientIDRes });
+//     } catch (e) {
+//       next(e)
+//     }
+// });
 
 export default router;

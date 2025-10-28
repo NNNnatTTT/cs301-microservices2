@@ -10,7 +10,8 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 CREATE TABLE IF NOT EXISTS request_list (
   id                  uuid                PRIMARY KEY DEFAULT gen_random_uuid(), --request
   entity_id           text                NOT NULL, -- Profile or Account
-  supporting_docs      BOOLEAN             NOT NULL,
+  -- is_ready            BOOLEAN             NOT NULL CHECK -- must be true, if false cannot be created, Need store or can just check?
+  supporting_docs     BOOLEAN             NOT NULL DEFAULT 'false',
   submitted_at        timestamptz         NOT NULL DEFAULT now(),
   submitted_by        uuid                NOT NULL,
   verified_at         date                NOT NULL,

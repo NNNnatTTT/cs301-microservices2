@@ -31,8 +31,8 @@ async function createAgent({ firstName, lastName, email, adminID }) {
 
     const values = [firstName, lastName, email, "agent", adminID];
     const result = await client.query(insertQuery, values);
-
     const agentId = result.rows[0].agent_id;
+    
     
     await client.query("COMMIT");
     return agentId;

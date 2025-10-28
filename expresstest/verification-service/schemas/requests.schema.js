@@ -6,6 +6,7 @@ const uuid = z.string().uuid();
 export const createRequestSchema = z.object({
   enttiyID: z.coerce.string().uuid(),
   supportingDocs: z.coerce.boolean(),
+  isReady: z.coerce.boolean(),
 });
 
 // UPDATE (PATCH /profiles/)

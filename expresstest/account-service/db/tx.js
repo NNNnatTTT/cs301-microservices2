@@ -18,6 +18,24 @@ async function isEligible(id, agentID, client) {
   }
 }
 
+async function isEligibleClientID(clientID, agentID, client) {
+  console.log(agentID, clientID);
+  try {
+    const query = `
+      SELECT EXISTS (
+        SELECT 1 FROM accounts.account_list WHERE client_id = $1 AND agent_id = $2
+        AND deleted_at IS NULL
+      ) AS eligible;
+    `;
+
+    const {rows } = await client.query(query, [clientID, agentID]);
+    return !!rows[0].eligible;
+  } catch (e) {
+    console.error('Error reading agent: ', e)
+      throw e;
+  }
+}
+
 // NOT FOR PROD
 async function createAccount({clientID, accountType, openingDate, initialDeposit, currency, branchID, agentID}) {
   const client = await pool.connect();
@@ -45,45 +63,45 @@ async function createAccount({clientID, accountType, openingDate, initialDeposit
   }
 }
 
-async function draftAccount({clientID, accountType, openingDate, initialDeposit, currency, branchID}) {
-  const client = await pool.connect();
-  try {
+// async function draftAccount({clientID, accountType, openingDate, initialDeposit, currency, branchID}) {
+//   const client = await pool.connect();
+//   try {
     
-    const fields = ['client_id', 'account_type', 'branch_id'];
-    const placeHolder = ['$1', '$2', '$3'];
-    const values = [clientID, accountType, branchID];
-    let i = 3;
+//     const fields = ['client_id', 'account_type', 'branch_id'];
+//     const placeHolder = ['$1', '$2', '$3'];
+//     const values = [clientID, accountType, branchID];
+//     let i = 3;
 
-    const push = (column, value) => {
-      fields.push(`${column}`);
-      values.push(value)
-      placeHolder.push(`, $${++i}`);
-    };
+//     const push = (column, value) => {
+//       fields.push(`${column}`);
+//       values.push(value)
+//       placeHolder.push(`, $${++i}`);
+//     };
 
-    if (openingDate !== undefined) push('opening_date', openingDate);
-    if (initialDeposit  !== undefined) push('initial_deposit',  initialDeposit);
-    if (currency  !== undefined) push('currency',  currency);
+//     if (openingDate !== undefined) push('opening_date', openingDate);
+//     if (initialDeposit  !== undefined) push('initial_deposit',  initialDeposit);
+//     if (currency  !== undefined) push('currency',  currency);
 
-    const insertQuery = `
-      INSERT INTO accounts.account_list (${fields.join(', ')})
-      VALUES (${placeHolder.join(', ')})
-      RETURNING id;
-    `;
+//     const insertQuery = `
+//       INSERT INTO accounts.account_list (${fields.join(', ')})
+//       VALUES (${placeHolder.join(', ')})
+//       RETURNING id;
+//     `;
 
-    // const values = [clientID, accountType, branchID, ...values];
+//     // const values = [clientID, accountType, branchID, ...values];
 
-    await client.query('BEGIN');
-    const result = await client.query(insertQuery, values);
-    await client.query("COMMIT");
+//     await client.query('BEGIN');
+//     const result = await client.query(insertQuery, values);
+//     await client.query("COMMIT");
 
-    return result.rows[0].id;
-  } catch (e) {
-    try { await client.query("ROLLBACK"); } catch {}
-      throw e;
-  } finally {
-    client.release();
-  }
-}
+//     return result.rows[0].id;
+//   } catch (e) {
+//     try { await client.query("ROLLBACK"); } catch {}
+//       throw e;
+//   } finally {
+//     client.release();
+//   }
+// }
 
 // NOT FOR PROD
 async function getAccountByIDDev({ id }) {
@@ -174,7 +192,7 @@ async function getAccountPagesByAgentID({limit, offset, agentID}) {
 async function getAccountPagesByClientID({clientID, limit, offset, agentID}) {
   const client = await pool.connect();
   try {
-    const ok = await isEligible(clientID, agentID, client);
+    const ok = await isEligibleClientID(clientID, agentID, client);
     if (!ok) throw new Error("Not Elligible");
 
     const getAccountPagesByClientIDQuery = `
@@ -317,6 +335,41 @@ async function updateAccount({ id, accountType, accountStatus, openingDate, init
   }
 }
 
+async function verifyAccount({id, agentID}) {
+  const client = await pool.connect();
+  try {
+    const ok = await isEligible(id, agentID, client);
+    if (!ok) throw new Error('Not Elligible');
+
+    const params = [id, agentID];
+
+    await client.query('BEGIN');
+    const sql = `
+      UPDATE accounts.account_list
+      SET account_status = 'Active',
+          updated_at = now()
+      WHERE id = $1
+        AND agent_id = $2
+        AND account_status = 'Inactive'
+        AND deleted_at IS NULL
+      RETURNING id, client_id, account_type, account_status, opening_date, initial_deposit, currency, branch_id;
+    `;
+
+    const result = await client.query(sql, params);
+    if (result.rowCount === 0) {
+      throw new Error('No rows affected');
+    }
+    await client.query("COMMIT");
+    console.log('rowCount:', result.rowCount, 'rows:', result.rows);
+    return result.rows[0] || null;
+  } catch (e) {
+    try { await client.query("ROLLBACK"); } catch {}
+      throw e;
+  } finally {
+    client.release();
+  }
+}
+
 async function softDeleteAccount({id, deleteReason, agentID}) {
   const client = await pool.connect();
   try {
@@ -345,6 +398,33 @@ async function softDeleteAccount({id, deleteReason, agentID}) {
   }
 }
 
+async function hardDeleteAccount({id, agentID}) {
+  const client = await pool.connect();
+  try {
+    const ok = await isEligible( id, agentID, client);
+    if (!ok) throw new Error('Not Elligible');
+    const sql = `
+      DELETE FROM accounts.account_list
+      WHERE id = $1
+        AND deleted_at IS NULL
+      RETURNING id
+    `;
+    await client.query('BEGIN');
+    const result = await client.query(sql, [id, agentID, deleteReason]);
+
+    if (result.rowCount === 0) {
+      throw new Error('Delete failed, not found');
+    }
+    await client.query("COMMIT");
+    return result.rows[0];
+  } catch (e) {
+    try { await client.query("ROLLBACK"); } catch {}
+      throw e;
+  } finally {
+    client.release();
+  }
+}
+
 
 
 
@@ -355,6 +435,6 @@ export { createAccount,
         getAccountByID,
         getAccountPagesByClientID, getAccountPagesByBranchID, getAccountPagesByAgentID,
         // searchAccount,
-        updateAccount, 
+        updateAccount, verifyAccount, 
         softDeleteAccount, 
       };

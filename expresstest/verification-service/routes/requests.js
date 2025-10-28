@@ -16,6 +16,9 @@ router.post ("/submitRequest", requireAuth, validate(schema.createRequestSchema)
         return res.status(403).json({ error: "Forbidden", message: "Missing agentID" });
       }
 
+      const isReady = req.validated.isReady;
+      if (!isReady) return res.status(400).json({ details : "Not ready"});
+
       const profileID = await requestTX.createRequest({
         ...req.validated, 
         agentID,
@@ -109,6 +112,27 @@ router.get ("/all", requireAuth, validateQuery(schema.pageAllSchema), async(req,
 //       next(e)
 //     }
 // });
+
+router.put ("/supportingDocs", requireAuth, validate(schema.docsSchema), async(req, res, next) => {
+  try {
+      const agentID = req.user?.id;
+      const id = req.validatedQuery.id;
+
+      if (!agentID) {
+        return res.status(403).json({ error: "Forbidden", message: "Missing agentID" });
+      }
+
+      // NOT COMPLETEEEEE
+      const profileID = await requestTX.supportingDocs({
+        agentID,
+        id
+      });
+
+      return res.status(201).json({ profileID });
+    } catch (e) {
+      next(e)
+    }
+});
 
 router.put ("/verifyProfile", requireAuth, validateQuery(schema.paramID), async(req, res, next) => {
   try {
