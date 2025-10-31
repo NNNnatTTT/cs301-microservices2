@@ -1,4 +1,7 @@
 import pool from "./pool.js";
+import * as cognito from "../cognito/services/cognito.service.js";
+// import * as agentQuery from "./query.js";
+// import * as agentException from "../utils/exceptions.js";
 
 async function isElligible({adminID, agentID}) {
   console.log({adminID, agentID});
@@ -28,17 +31,33 @@ async function createAgent({ firstName, lastName, email, adminID }) {
       VALUES ($1, $2, $3, $4, $5)
       RETURNING agent_id;
     `;
-
     const values = [firstName, lastName, email, "agent", adminID];
     const result = await client.query(insertQuery, values);
-    const agentId = result.rows[0].agent_id;
+    const createdID = result.rows[0].agent_id;
     
-    
+    const cognitoRes = await cognito.cognitoCreateUser({email, firstName, lastName});
+    const sub = cognitoRes?.User?.Attributes?.find((a) => a.Name === 'sub')?.Value;
+    const insertCogSubQuery =`
+      UPDATE agents.agent_list
+      SET cognito_sub = $1,
+        updated_at = now()
+      WHERE 
+        agent_id = $2
+        AND deleted_at IS NULL
+      RETURNING agent_id
+      ;`;
+    const updateValues = [sub, createdID,]
+    const updateCognitoSubResult = await client.query(insertCogSubQuery, updateValues);
+    const agentID = updateCognitoSubResult.rows[0].agent_id;
     await client.query("COMMIT");
-    return agentId;
+    return agentID;
   } catch (e) {
-    try { await client.query("ROLLBACK"); } catch {}
-      throw e;
+    try { 
+      await client.query("ROLLBACK"); 
+    } catch (rollbackError) {
+      throw rollbackError;
+    }
+    throw e;
       // next(e)
   } finally {
     client.release();
@@ -97,7 +116,9 @@ async function getAgentByIDByAdminID({ adminID, agentID }) {
     `;
 
     const result = await client.query(selectByIDQuery, [agentID, adminID]);
-    
+    // if (rows.length === 0) throw new NotFoundError("Agent not found for this admin");
+    // if (rows.length === 0) throw new NotFoundError(); // Will default msg in class print?
+
     return result.rows[0] || null;
   } catch (e) {
     console.error('Error reading agent: ', e)
@@ -316,14 +337,22 @@ async function softDeleteAgent({adminID, agentID, deleteReason}) {
       WHERE agent_id = $1
         AND admin_id = $2
         AND deleted_at IS NULL
-      RETURNING agent_id, deleted_at
+      RETURNING agent_id, email, deleted_at
     `;
     await client.query('BEGIN');
-    const result = await client.query(sql, [agentID, adminID, deleteReason]);
-
-    if (result.rowCount === 0) {
+    const softDeleteResult = await client.query(sql, [agentID, adminID, deleteReason]);
+    const result = [softDeleteResult.rows[0].agent_id, softDeleteResult.rows[0].deleted_at];
+    if (softDeleteResult.rowCount === 0) {
       throw new Error('Soft delete failed, not found ');
     }
+
+    // Idk if this will work, according to documentation this is in the metadata but idk
+    // if can just check like this
+    const cognitoRes = await cognito.cognitoDisableUser(softDeleteResult.rows[0].email);
+    if (cognitoRes.httpStatusCode !== '200') {
+      throw new Error('Failed to disable login')
+    }
+    
     await client.query("COMMIT");
     return result.rows[0];
   } catch (e) {

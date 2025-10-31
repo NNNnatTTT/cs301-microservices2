@@ -1,20 +1,24 @@
 import pool from "./pool.js";
+import * as profileQuery from "./query.js";
+import * as profileException from "../utils/exceptions.js";
 
 async function isElligible({agentID, id}) {
   console.log(agentID, id);
   try {
-    const query = `
-      SELECT EXISTS (
-        SELECT 1 FROM profiles.profile_list WHERE id = $1 AND agent_id = $2
-        AND deleted_at IS NULL
-      ) AS eligible;
-    `;
+    // const profileQuery.isEligiblequery = `
+    //   SELECT EXISTS (
+    //     SELECT 1 FROM profiles.profile_list WHERE id = $1 AND agent_id = $2
+    //     AND deleted_at IS NULL
+    //   ) AS eligible;
+    // `;
 
-    const {rows } = await pool.query(query, [id, agentID]);
+    const {rows } = await pool.query(profileQuery.isEligiblequery, [id, agentID]);
+    if (rows.length === 0) throw new profileException.NotFoundError();
     return !!rows[0].eligible;
   } catch (e) {
     console.error('Error reading agent: ', e)
-      throw e;
+      // throw e;
+      throw new profileException.ForbiddenError();
   }
 }
 
@@ -24,16 +28,16 @@ async function createProfile({firstName, lastName, dateOfBirth, gender, email, p
   try {
     await client.query('BEGIN');
 
-    const insertQuery = `
-      INSERT INTO profiles.profile_list (first_name, last_name, date_of_birth, gender, email, phone_number, 
-      address, city, state, country, postal, status, agent_id)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-      RETURNING id;
-    `;
+    // const insertProfileQuery = `
+    //   INSERT INTO profiles.profile_list (first_name, last_name, date_of_birth, gender, email, phone_number, 
+    //   address, city, state, country, postal, status, agent_id)
+    //   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+    //   RETURNING id;
+    // `;
 
     const values = [firstName, lastName, dateOfBirth, gender, email, phoneNumber, 
                     address, city, state, country, postal, status, agentID ];
-    const result = await client.query(insertQuery, values);
+    const result = await client.query(profileQuery.insertProfileQuery, values);
 
     const profileID = result.rows[0].id;
     
@@ -51,14 +55,17 @@ async function createProfile({firstName, lastName, dateOfBirth, gender, email, p
 async function getProfileByID({ id }) {
   const client = await pool.connect();
   try {
-    const selectByIDQuery = `
-      SELECT id, first_name, last_name, date_of_birth, gender, email, phone_number, 
-      address, city, state, country, postal, status, agent_id
-      FROM profiles.profile_list
-      WHERE id = $1;
-    `;
+    // const selectByIDQuery = `
+    //   SELECT id, first_name, last_name, date_of_birth, gender, email, phone_number, 
+    //   address, city, state, country, postal, status, agent_id
+    //   FROM profiles.profile_list
+    //   WHERE id = $1;
+    // `;
 
-    const result = await client.query(selectByIDQuery, [id]);
+    const result = await client.query(profileQuery.devSelectByIDQuery, [id]);
+    if (result.rowCount === 0) {
+      throw new profileException.NotFoundError();
+    }
     
     return result.rows[0] || null;
   } catch (e) {
@@ -72,13 +79,13 @@ async function getProfileByID({ id }) {
 async function getAllProfiles({ id }) {
   const client = await pool.connect();
   try {
-    const selectByIDQuery = `
-      SELECT id, first_name, last_name, date_of_birth, gender, email, phone_number, 
-      address, city, state, country, postal, status, agent_id
-      FROM profiles.profile_list
-    `;
+    // const selectByIDQuery = `
+    //   SELECT id, first_name, last_name, date_of_birth, gender, email, phone_number, 
+    //   address, city, state, country, postal, status, agent_id
+    //   FROM profiles.profile_list
+    // `;
 
-    const {rows} = await client.query(selectByIDQuery, [id]);
+    const {rows} = await client.query(profileQuery.devSelectAllQuery, [id]);
     
     return rows || null;
   } catch (e) {
@@ -92,14 +99,14 @@ async function getAllProfiles({ id }) {
 async function getProfileByIDagentID({id, agentID}) {
   const client = await pool.connect();
   try {
-    const selectByIDQuery = `
-      SELECT id, first_name, last_name, date_of_birth, gender, email, phone_number, 
-      address, city, state, country, postal, status, agent_id
-      FROM profiles.profile_list
-      WHERE id = $1 AND agent_id = $2;
-    `;
+    // const selectByIDQuery = `
+    //   SELECT id, first_name, last_name, date_of_birth, gender, email, phone_number, 
+    //   address, city, state, country, postal, status, agent_id
+    //   FROM profiles.profile_list
+    //   WHERE id = $1 AND agent_id = $2;
+    // `;
 
-    const result = await client.query(selectByIDQuery, [id, agentID]);
+    const result = await client.query(profileQuery.selectByIDAgentIDQuery, [id, agentID]);
     
     return result.rows[0] || null;
   } catch (e) {
@@ -113,16 +120,16 @@ async function getProfileByIDagentID({id, agentID}) {
 async function getProfilePagesByAgentID({agentID, limit, offset}) {
   const client = await pool.connect();
   try {
-    const selectByIDQuery = `
-      SELECT id, first_name, last_name, date_of_birth, gender, email, phone_number, 
-      address, city, state, country, postal, status, agent_id
-      FROM profiles.profile_list
-      WHERE agent_id = $1 AND deleted_at IS NULL
-      ORDER BY created_at DESC, agent_id DESC
-      LIMIT $2 OFFSET $3;
-    `;
+    // const selectByIDQuery = `
+    //   SELECT id, first_name, last_name, date_of_birth, gender, email, phone_number, 
+    //   address, city, state, country, postal, status, agent_id
+    //   FROM profiles.profile_list
+    //   WHERE agent_id = $1 AND deleted_at IS NULL
+    //   ORDER BY created_at DESC, agent_id DESC
+    //   LIMIT $2 OFFSET $3;
+    // `;
 
-    const {rows} = await client.query(selectByIDQuery, [agentID, limit, offset]);
+    const {rows} = await client.query(profileQuery.pageByAgentIDQuery, [agentID, limit, offset]);
     
     return rows || null;
   } catch (e) {
@@ -139,32 +146,35 @@ async function searchProfile ({agentID, searchValue, limit, offset}) {
   try {
     console.log(searchValue);
     // No DOB, gender or status
-    const searchQuery = `
-      SELECT id, first_name, last_name, date_of_birth, gender, email, phone_number, 
-      address, city, state, country, postal, status, agent_id
-      FROM profiles.profile_list
-      WHERE agent_id = $2
-        AND deleted_at IS NULL AND (
-              (first_name       ILIKE $1::text)
-          OR (last_name         ILIKE $1::text)
-          OR (email             ILIKE $1::citext)
-          OR translate(phone_number, ' -', '') ILIKE '%' || translate($1::text, ' -', '') || '%'
-          OR (address           ILIKE $1::text)
-          OR (city              ILIKE $1::text)
-          OR (state             ILIKE $1::text)
-          OR (country           ILIKE $1::text)
-          OR (postal            ILIKE $1::text)
-        )
-      ORDER BY created_at DESC, agent_id DESC
-      LIMIT $3 OFFSET $4;
-    `;
-    // ORDER BY created_at DESC, agent_id DESC LIMIT 10;
+    // const searchQuery = `
+    //   SELECT id, first_name, last_name, date_of_birth, gender, email, phone_number, 
+    //   address, city, state, country, postal, status, agent_id
+    //   FROM profiles.profile_list
+    //   WHERE agent_id = $2
+    //     AND deleted_at IS NULL AND (
+    //           (first_name       ILIKE $1::text)
+    //       OR (last_name         ILIKE $1::text)
+    //       OR (email             ILIKE $1::citext)
+    //       OR translate(phone_number, ' -', '') ILIKE '%' || translate($1::text, ' -', '') || '%'
+    //       OR (address           ILIKE $1::text)
+    //       OR (city              ILIKE $1::text)
+    //       OR (state             ILIKE $1::text)
+    //       OR (country           ILIKE $1::text)
+    //       OR (postal            ILIKE $1::text)
+    //     )
+    //   ORDER BY created_at DESC, agent_id DESC
+    //   LIMIT $3 OFFSET $4;
+    // `;
+    // // ORDER BY created_at DESC, agent_id DESC LIMIT 10;
 
 
-    const { rows } = await client.query(searchQuery, [
+    const { rows } = await client.query(profileQuery.searchQuery, [
       searchValue ? `%${searchValue}%` : null,
       agentID, limit, offset
     ]);
+    if (rows.length === 0) {
+      throw new profileException.NotFoundError();
+    }
     console.log(rows);
     return rows || null;
   } catch (e) {
@@ -180,7 +190,7 @@ async function updateProfile({ id, firstName, lastName, dateOfBirth, gender, ema
   const client = await pool.connect();
   try {
     const ok = await isElligible({ agentID, id});
-    if (!ok) throw new Error('Not Elligible');
+    if (!ok) throw new profileException.ForbiddenError();
     
     const fields = [];
     const values = [];
@@ -214,20 +224,20 @@ async function updateProfile({ id, firstName, lastName, dateOfBirth, gender, ema
     const params = [id, agentID, ...values];
 
     await client.query('BEGIN');
-    const sql = `
-      UPDATE profiles.profile_list
-      SET ${fields.join(', ')},
-          updated_at = now()
-      WHERE id = $1
-        AND agent_id = $2
-        AND deleted_at IS NULL
-      RETURNING id, first_name, last_name, date_of_birth, gender, email, phone_number, 
-      address, city, state, country, postal, status, agent_id, updated_at;
-    `;
+    // const sql = `
+    //   UPDATE profiles.profile_list
+    //   SET ${fields.join(', ')},
+    //       updated_at = now()
+    //   WHERE id = $1
+    //     AND agent_id = $2
+    //     AND deleted_at IS NULL
+    //   RETURNING id, first_name, last_name, date_of_birth, gender, email, phone_number, 
+    //   address, city, state, country, postal, status, agent_id, updated_at;
+    // `;
 
-    const result = await client.query(sql, params);
+    const result = await client.query(profileQuery.dynamicUpdate(fields), params);
     if (result.rowCount === 0) {
-      throw new Error('No rows affected');
+      throw new profileException.NoAffectedRowError();
     }
     await client.query("COMMIT");
     return result.rows[0] || null;
@@ -245,16 +255,16 @@ async function verifyProfile ({id, agentID}) {
     const ok = await isElligible({ id, agentID, client});
     if (!ok) throw new Error('Not Elligible');
 
-    const verifySQL = `
-      UPDATE profiles.profile_list
-      SET profile_status = 'Active'
-      WHERE id = $1
-        AND agent_id = $2
-        AND deleted_at IS NULL
-      RETURNING id
-    `;
+    // const verifySQL = `
+    //   UPDATE profiles.profile_list
+    //   SET profile_status = 'Active'
+    //   WHERE id = $1
+    //     AND agent_id = $2
+    //     AND deleted_at IS NULL
+    //   RETURNING id
+    // `;
     await client.query('BEGIN')
-    const result = client.query(verifySQL, [id, agentID]);
+    const result = client.query(profileQuery.verifyProfileQuery, [id, agentID]);
     if (result.rowCount === 0) {
       throw new Error('No rows affected');
     }
@@ -274,16 +284,16 @@ async function softDeleteProfile({id, agentID, deleteReason}) {
   try {
     const ok = await isElligible({ id, agentID, client});
     if (!ok) throw new Error('Not Elligible');
-    const sql = `
-      UPDATE profiles.profile_list
-      SET deleted_by = $2, deleted_at = now(), updated_at = now(), delete_reason = $3
-      WHERE id = $1
-        AND agent_id = $2
-        AND deleted_at IS NULL
-      RETURNING id, deleted_at
-    `;
+    // const sql = `
+    //   UPDATE profiles.profile_list
+    //   SET deleted_by = $2, deleted_at = now(), updated_at = now(), delete_reason = $3
+    //   WHERE id = $1
+    //     AND agent_id = $2
+    //     AND deleted_at IS NULL
+    //   RETURNING id, deleted_at
+    // `;
     await client.query('BEGIN');
-    const result = await client.query(sql, [id, agentID, deleteReason]);
+    const result = await client.query(profileQuery.softDeleteQuery, [id, agentID, deleteReason]);
 
     if (result.rowCount === 0) {
       throw new Error('Soft delete failed, not found ');

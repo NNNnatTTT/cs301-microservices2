@@ -21,8 +21,9 @@ function generateTempPassword() {
   return `A1!${base}`; // e.g. ensures upper+digit+special
 }
 
-export async function cognitoCreateUser({ email, firstName, lastName, role }) {
+export async function cognitoCreateUser({ email, firstName, lastName}) {
   // 1. Create the user in Cognito
+  const role = "agent";
   const create = await client.send(
     new AdminCreateUserCommand({
       UserPoolId: USER_POOL_ID,

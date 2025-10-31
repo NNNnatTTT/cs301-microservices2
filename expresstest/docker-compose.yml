@@ -21,39 +21,39 @@ services:
   #     timeout: 3s
   #     retries: 20
 
-  # profile-db:
-  #   image: postgres:16
-  #   container_name: profiledb
-  #   environment:
-  #     POSTGRES_USER: ${PROFILE_PGUSER}
-  #     POSTGRES_PASSWORD: ${PROFILE_PGPASSWORD}
-  #     POSTGRES_DB: ${PROFILE_PGDB}
-  #   volumes:
-  #     - profile_dbdata:/var/lib/postgresql/data
-  #     # seed data for profile service (optional)
-  #     - ./profile-service/docker/init:/docker-entrypoint-initdb.d:ro
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "pg_isready -U ${PROFILE_PGUSER} -d ${PROFILE_PGDB}"]
-  #     interval: 5s
-  #     timeout: 3s
-  #     retries: 20
-
-  account-db:
+  profile-db:
     image: postgres:16
-    container_name: accountdb
+    container_name: profiledb
     environment:
-      POSTGRES_USER: ${ACCOUNT_PGUSER}
-      POSTGRES_PASSWORD: ${ACCOUNT_PGPASSWORD}
-      POSTGRES_DB: ${ACCOUNT_PGDB}
+      POSTGRES_USER: ${PROFILE_PGUSER}
+      POSTGRES_PASSWORD: ${PROFILE_PGPASSWORD}
+      POSTGRES_DB: ${PROFILE_PGDB}
     volumes:
-      - account_dbdata:/var/lib/postgresql/data
-      # seed data for account service (optional)
-      - ./account-service/docker/init:/docker-entrypoint-initdb.d:ro
+      - profile_dbdata:/var/lib/postgresql/data
+      # seed data for profile service (optional)
+      - ./profile-service/docker/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${ACCOUNT_PGUSER} -d ${ACCOUNT_PGDB}"]
+      test: ["CMD-SHELL", "pg_isready -U ${PROFILE_PGUSER} -d ${PROFILE_PGDB}"]
       interval: 5s
       timeout: 3s
       retries: 20
+
+  # account-db:
+  #   image: postgres:16
+  #   container_name: accountdb
+  #   environment:
+  #     POSTGRES_USER: ${ACCOUNT_PGUSER}
+  #     POSTGRES_PASSWORD: ${ACCOUNT_PGPASSWORD}
+  #     POSTGRES_DB: ${ACCOUNT_PGDB}
+  #   volumes:
+  #     - account_dbdata:/var/lib/postgresql/data
+  #     # seed data for account service (optional)
+  #     - ./account-service/docker/init:/docker-entrypoint-initdb.d:ro
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U ${ACCOUNT_PGUSER} -d ${ACCOUNT_PGDB}"]
+  #     interval: 5s
+  #     timeout: 3s
+  #     retries: 20
 
   # transaction-db:
   #   image: postgres:16
@@ -92,39 +92,39 @@ services:
   #   volumes:
   #     - ./agent-service:/usr/src/app
   
-  # profile-service:
-  #   build:
-  #     context: ./profile-service
-  #     dockerfile: Dockerfile
-  #   env_file:
-  #     - ./profile-service/.env
-  #   container_name: profile-service
-  #   ports:
-  #     - "3001:3000"
-  #   environment:
-  #     DATABASE_URL: postgres://${PROFILE_PGUSER}:${PROFILE_PGPASSWORD}@profile-db:5432/${PROFILE_PGDB}
-  #   depends_on:
-  #     profile-db:
-  #       condition: service_healthy
-  #   volumes:
-  #     - ./profile-service:/usr/src/app
-
-  account-service:
+  profile-service:
     build:
-      context: ./account-service
+      context: ./profile-service
       dockerfile: Dockerfile
     env_file:
-      - ./account-service/.env
-    container_name: account-service
+      - ./profile-service/.env
+    container_name: profile-service
     ports:
-      - "3003:3000"
+      - "3001:3000"
     environment:
-      DATABASE_URL: postgres://${ACCOUNT_PGUSER}:${ACCOUNT_PGPASSWORD}@ACCOUNT-db:5432/${ACCOUNT_PGDB}
+      DATABASE_URL: postgres://${PROFILE_PGUSER}:${PROFILE_PGPASSWORD}@profile-db:5432/${PROFILE_PGDB}
     depends_on:
-      account-db:
+      profile-db:
         condition: service_healthy
     volumes:
-      - ./account-service:/usr/src/app
+      - ./profile-service:/usr/src/app
+
+  # account-service:
+  #   build:
+  #     context: ./account-service
+  #     dockerfile: Dockerfile
+  #   env_file:
+  #     - ./account-service/.env
+  #   container_name: account-service
+  #   ports:
+  #     - "3003:3000"
+  #   environment:
+  #     DATABASE_URL: postgres://${ACCOUNT_PGUSER}:${ACCOUNT_PGPASSWORD}@ACCOUNT-db:5432/${ACCOUNT_PGDB}
+  #   depends_on:
+  #     account-db:
+  #       condition: service_healthy
+  #   volumes:
+  #     - ./account-service:/usr/src/app
 
   # transaction-service:
   #   build:
@@ -154,8 +154,8 @@ services:
 
 volumes:
   # dbdata:
-  # profile_dbdata:
+  profile_dbdata:
   # transaction_dbdata:
-  account_dbdata:
+  # account_dbdata:
 
   # docker compose down -v at the end

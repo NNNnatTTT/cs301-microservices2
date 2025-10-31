@@ -11,9 +11,14 @@ const router = Router();
 router.post ("/createAgent", requireAuth, validate(schema.createAgentSchema), async(req, res, next) => {
   try {
       const adminID = req.user?.id;
+      const role = req.user?.role;
 
       if (!adminID) {
         return res.status(403).json({ error: "Forbidden", message: "Missing adminID" });
+      }
+
+      if (role !== 'admin') {
+        throw new Error ("Not admin");
       }
 
       const agentID = await agentTX.createAgent({
