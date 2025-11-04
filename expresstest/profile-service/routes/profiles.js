@@ -31,7 +31,7 @@ router.post ("/createProfile", requireAuth, validate(schema.createProfileSchema)
 router.get ("/findByID", requireAuth, validateQuery(schema.paramID), async(req, res, next) => {
   try {
       const agentID = req.user?.id;
-      const id = req.validated.id;
+      const id = req.validatedQuery.id;
 
       if (!agentID) {
         return res.status(403).json({ error: "Forbidden", message: "Missing agentID" });
@@ -59,7 +59,7 @@ router.get ("/all", requireAuth, validateQuery(schema.pageAllClientSchema), asyn
       }
 
       const clients = await profileTX.getProfilePagesByAgentID({
-        ...req.validated,
+        ...req.validatedQuery,
         agentID,
       });
 
@@ -194,7 +194,7 @@ router.put ("/verifyProfile", requireAuth, validateQuery(schema.paramID), async(
         return res.status(403).json({ error: "Forbidden", message: "Missing agentID" });
       }
 
-      const profileID = await profileTX.updateProfile({
+      const profileID = await profileTX.verifyProfile({
         agentID,
         id
       });

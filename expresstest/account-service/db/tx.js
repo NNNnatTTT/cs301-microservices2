@@ -1,16 +1,17 @@
 import pool from "./pool.js";
+import * as profileQuery from "./query.js";
 
 async function isEligible(id, agentID, client) {
   console.log(agentID, id);
   try {
-    const query = `
-      SELECT EXISTS (
-        SELECT 1 FROM accounts.account_list WHERE id = $1 AND agent_id = $2
-        AND deleted_at IS NULL
-      ) AS eligible;
-    `;
+    // const query = `
+    //   SELECT EXISTS (
+    //     SELECT 1 FROM accounts.account_list WHERE id = $1 AND agent_id = $2
+    //     AND deleted_at IS NULL
+    //   ) AS eligible;
+    // `;
 
-    const {rows } = await client.query(query, [id, agentID]);
+    const {rows } = await client.query(profileQuery.isEligibleQuery, [id, agentID]);
     return !!rows[0].eligible;
   } catch (e) {
     console.error('Error reading agent: ', e)
@@ -21,14 +22,14 @@ async function isEligible(id, agentID, client) {
 async function isEligibleClientID(clientID, agentID, client) {
   console.log(agentID, clientID);
   try {
-    const query = `
-      SELECT EXISTS (
-        SELECT 1 FROM accounts.account_list WHERE client_id = $1 AND agent_id = $2
-        AND deleted_at IS NULL
-      ) AS eligible;
-    `;
+    // const query = `
+    //   SELECT EXISTS (
+    //     SELECT 1 FROM accounts.account_list WHERE client_id = $1 AND agent_id = $2
+    //     AND deleted_at IS NULL
+    //   ) AS eligible;
+    // `;
 
-    const {rows } = await client.query(query, [clientID, agentID]);
+    const {rows } = await client.query(profileQuery.isEligibleClientIDQuery, [clientID, agentID]);
     return !!rows[0].eligible;
   } catch (e) {
     console.error('Error reading agent: ', e)
@@ -42,14 +43,14 @@ async function createAccount({clientID, accountType, openingDate, initialDeposit
   try {
     await client.query('BEGIN');
 
-    const insertQuery = `
-      INSERT INTO accounts.account_list (client_id, account_type, opening_date, initial_deposit, currency, branch_id, agent_id)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
-      RETURNING id;
-    `;
+    // const insertQuery = `
+    //   INSERT INTO accounts.account_list (client_id, account_type, opening_date, initial_deposit, currency, branch_id, agent_id)
+    //   VALUES ($1, $2, $3, $4, $5, $6, $7)
+    //   RETURNING id;
+    // `;
 
     const values = [clientID, accountType, openingDate, initialDeposit, currency, branchID, agentID];
-    const result = await client.query(insertQuery, values);
+    const result = await client.query(profileQuery.defaultCreateAccount, values);
 
     const accountID = result.rows[0].id;
     
@@ -107,13 +108,13 @@ async function createAccount({clientID, accountType, openingDate, initialDeposit
 async function getAccountByIDDev({ id }) {
   const client = await pool.connect();
   try {
-    const selectByIDQuery = `
-      SELECT id, client_id, account_type, account_status, opening_date, initial_deposit, currency, branch_id
-      FROM accounts.account_list
-      WHERE id = $1;
-    `;
+    // const selectByIDQuery = `
+    //   SELECT id, client_id, account_type, account_status, opening_date, initial_deposit, currency, branch_id
+    //   FROM accounts.account_list
+    //   WHERE id = $1;
+    // `;
 
-    const result = await client.query(selectByIDQuery, [id]);
+    const result = await client.query(profileQuery.devSelectByIDQuery, [id]);
     
     return result.rows[0] || null;
   } catch (e) {
@@ -127,12 +128,12 @@ async function getAccountByIDDev({ id }) {
 async function getAllAccountsDev({ id }) {
   const client = await pool.connect();
   try {
-    const selectByIDQuery = `
-      SELECT id, client_id, account_type, account_status, opening_date, initial_deposit, currency, branch_id
-      FROM accounts.account_list
-    `;
+    // const selectByIDQuery = `
+    //   SELECT id, client_id, account_type, account_status, opening_date, initial_deposit, currency, branch_id
+    //   FROM accounts.account_list
+    // `;
 
-    const {rows} = await client.query(selectByIDQuery);
+    const {rows} = await client.query(profileQuery.devSelectAllQuery);
     
     return rows || null;
   } catch (e) {
@@ -149,14 +150,14 @@ async function getAccountByID({id, agentID}) {
     const ok = await isEligible(id, agentID, client);
     if (!ok) throw new Error("Not Elligible");
 
-    const getAccountByIDClientID = `
-      SELECT id, client_id, account_type, account_status, opening_date, initial_deposit, currency, branch_id
-      FROM accounts.account_list
-      WHERE id = $1
-      AND deleted_at IS NULL;
-    `;
+    // const getAccountByIDClientID = `
+    //   SELECT id, client_id, account_type, account_status, opening_date, initial_deposit, currency, branch_id
+    //   FROM accounts.account_list
+    //   WHERE id = $1
+    //   AND deleted_at IS NULL;
+    // `;
 
-    const result = await client.query(getAccountByIDClientID, [id]);
+    const result = await client.query(profileQuery.getAccountByIDQuery, [id]);
     
     return result.rows[0] || null;
   } catch (e) {
@@ -170,15 +171,15 @@ async function getAccountByID({id, agentID}) {
 async function getAccountPagesByAgentID({limit, offset, agentID}) {
   const client = await pool.connect();
   try {
-    const getAccountPagesByClientIDQuery = `
-      SELECT id, client_id, account_type, account_status, opening_date, initial_deposit, currency, branch_id
-      FROM accounts.account_list
-      WHERE agent_id = $1 AND deleted_at IS NULL
-      ORDER BY opening_date DESC, created_at DESC
-      LIMIT $2 OFFSET $3;
-    `;
+    // const getAccountPagesByClientIDQuery = `
+    //   SELECT id, client_id, account_type, account_status, opening_date, initial_deposit, currency, branch_id
+    //   FROM accounts.account_list
+    //   WHERE agent_id = $1 AND deleted_at IS NULL
+    //   ORDER BY opening_date DESC, created_at DESC
+    //   LIMIT $2 OFFSET $3;
+    // `;
 
-    const {rows} = await client.query(getAccountPagesByClientIDQuery, [agentID, limit, offset]);
+    const {rows} = await client.query(profileQuery.pageByAgentIDQuery, [agentID, limit, offset]);
     
     return rows || null;
   } catch (e) {
@@ -195,15 +196,15 @@ async function getAccountPagesByClientID({clientID, limit, offset, agentID}) {
     const ok = await isEligibleClientID(clientID, agentID, client);
     if (!ok) throw new Error("Not Elligible");
 
-    const getAccountPagesByClientIDQuery = `
-      SELECT id, client_id, account_type, account_status, opening_date, initial_deposit, currency, branch_id
-      FROM accounts.account_list
-      WHERE client_id = $1 AND deleted_at IS NULL
-      ORDER BY opening_date DESC, created_at DESC
-      LIMIT $2 OFFSET $3;
-    `;
+    // const getAccountPagesByClientIDQuery = `
+    //   SELECT id, client_id, account_type, account_status, opening_date, initial_deposit, currency, branch_id
+    //   FROM accounts.account_list
+    //   WHERE client_id = $1 AND deleted_at IS NULL
+    //   ORDER BY opening_date DESC, created_at DESC
+    //   LIMIT $2 OFFSET $3;
+    // `;
 
-    const {rows} = await client.query(getAccountPagesByClientIDQuery, [clientID, limit, offset]);
+    const {rows} = await client.query(profileQuery.pageByClientIDQuery, [clientID, limit, offset]);
     
     return rows || null;
   } catch (e) {
@@ -217,16 +218,16 @@ async function getAccountPagesByClientID({clientID, limit, offset, agentID}) {
 async function getAccountPagesByBranchID({branchID, agentID, limit, offset}) {
   const client = await pool.connect();
   try {
-    const getAccountPagesBranchIDQuery = `
-      SELECT id, client_id, account_type, account_status, opening_date, initial_deposit, currency, branch_id
-      FROM accounts.account_list
-      WHERE branch_id = $1 AND agent_id = $2
-      AND deleted_at IS NULL
-      ORDER BY opening_date DESC, created_at DESC
-      LIMIT $3 OFFSET $4;
-    `;
+    // const getAccountPagesBranchIDQuery = `
+    //   SELECT id, client_id, account_type, account_status, opening_date, initial_deposit, currency, branch_id
+    //   FROM accounts.account_list
+    //   WHERE branch_id = $1 AND agent_id = $2
+    //   AND deleted_at IS NULL
+    //   ORDER BY opening_date DESC, created_at DESC
+    //   LIMIT $3 OFFSET $4;
+    // `;
 
-    const {rows} = await client.query(getAccountPagesBranchIDQuery, [branchID, agentID, limit, offset]);
+    const {rows} = await client.query(profileQuery.pageByBranchIDQuery, [branchID, agentID, limit, offset]);
     
     return rows || null;
   } catch (e) {
@@ -311,17 +312,17 @@ async function updateAccount({ id, accountType, accountStatus, openingDate, init
     const params = [id, agentID, ...values];
 
     await client.query('BEGIN');
-    const sql = `
-      UPDATE accounts.account_list
-      SET ${fields.join(', ')},
-          updated_at = now()
-      WHERE id = $1
-        AND agent_id = $2
-        AND deleted_at IS NULL
-      RETURNING id, client_id, account_type, account_status, opening_date, initial_deposit, currency, branch_id;
-    `;
+    // const sql = `
+    //   UPDATE accounts.account_list
+    //   SET ${fields.join(', ')},
+    //       updated_at = now()
+    //   WHERE id = $1
+    //     AND agent_id = $2
+    //     AND deleted_at IS NULL
+    //   RETURNING id, client_id, account_type, account_status, opening_date, initial_deposit, currency, branch_id;
+    // `;
 
-    const result = await client.query(sql, params);
+    const result = await client.query(await profileQuery.dynamicUpdateQuery(fields), params);
     if (result.rowCount === 0) {
       throw new Error('No rows affected');
     }
@@ -344,18 +345,18 @@ async function verifyAccount({id, agentID}) {
     const params = [id, agentID];
 
     await client.query('BEGIN');
-    const sql = `
-      UPDATE accounts.account_list
-      SET account_status = 'Active',
-          updated_at = now()
-      WHERE id = $1
-        AND agent_id = $2
-        AND account_status = 'Inactive'
-        AND deleted_at IS NULL
-      RETURNING id, client_id, account_type, account_status, opening_date, initial_deposit, currency, branch_id;
-    `;
+    // const sql = `
+    //   UPDATE accounts.account_list
+    //   SET account_status = 'Active',
+    //       updated_at = now()
+    //   WHERE id = $1
+    //     AND agent_id = $2
+    //     AND account_status = 'Inactive'
+    //     AND deleted_at IS NULL
+    //   RETURNING id, client_id, account_type, account_status, opening_date, initial_deposit, currency, branch_id;
+    // `;
 
-    const result = await client.query(sql, params);
+    const result = await client.query(profileQuery.verifyAccountQuery, params);
     if (result.rowCount === 0) {
       throw new Error('No rows affected');
     }
@@ -383,7 +384,7 @@ async function softDeleteAccount({id, deleteReason, agentID}) {
       RETURNING id, deleted_at
     `;
     await client.query('BEGIN');
-    const result = await client.query(sql, [id, agentID, deleteReason]);
+    const result = await client.query(profileQuery.softDeleteQuery, [id, agentID, deleteReason]);
 
     if (result.rowCount === 0) {
       throw new Error('Soft delete failed, not found ');
@@ -403,14 +404,14 @@ async function hardDeleteAccount({id, agentID}) {
   try {
     const ok = await isEligible( id, agentID, client);
     if (!ok) throw new Error('Not Elligible');
-    const sql = `
-      DELETE FROM accounts.account_list
-      WHERE id = $1
-        AND deleted_at IS NULL
-      RETURNING id
-    `;
+    // const sql = `
+    //   DELETE FROM accounts.account_list
+    //   WHERE id = $1
+    //     AND deleted_at IS NULL
+    //   RETURNING id
+    // `;
     await client.query('BEGIN');
-    const result = await client.query(sql, [id, agentID, deleteReason]);
+    const result = await client.query(profileQuery.devHardDeleteQuery, [id, agentID, deleteReason]);
 
     if (result.rowCount === 0) {
       throw new Error('Delete failed, not found');

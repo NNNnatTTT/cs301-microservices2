@@ -77,8 +77,8 @@ const searchQuery = `
 `;
 // ORDER BY created_at DESC, agent_id DESC LIMIT 10;
 
-async function dynamicUpdate({fields}) {
-    return  `
+async function dynamicUpdate(fields) {
+    const updateQuery = `
         UPDATE profiles.profile_list
         SET 
             ${fields.join(', ')},
@@ -90,17 +90,20 @@ async function dynamicUpdate({fields}) {
         RETURNING id, first_name, last_name, date_of_birth, gender, email, phone_number, 
         address, city, state, country, postal, status, agent_id, updated_at;
     `;
+    // console.log('Generated SQL:\n', updateQuery);
+    return updateQuery;
 } 
 
 const verifyProfileQuery = `
     UPDATE profiles.profile_list
     SET 
-        profile_status = 'Active'
+        status = 'Active',
+        updated_at = now()
     WHERE 
         id = $1
         AND agent_id = $2
         AND deleted_at IS NULL
-    RETURNING id
+    RETURNING id;
 `;
 
 const softDeleteQuery = `

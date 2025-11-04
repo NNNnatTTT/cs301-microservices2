@@ -1,6 +1,9 @@
-import pool from "./pool.js";
+// import pool from "./pool.js";
+import { initDB } from "./pool.js";
 import * as profileQuery from "./query.js";
 import * as profileException from "../utils/exceptions.js";
+
+const pool = await initDB();
 
 async function isElligible({agentID, id}) {
   console.log(agentID, id);
@@ -99,6 +102,8 @@ async function getAllProfiles({ id }) {
 async function getProfileByIDagentID({id, agentID}) {
   const client = await pool.connect();
   try {
+    const ok = await isElligible({ agentID, id});
+    if (!ok) throw new profileException.ForbiddenError();
     // const selectByIDQuery = `
     //   SELECT id, first_name, last_name, date_of_birth, gender, email, phone_number, 
     //   address, city, state, country, postal, status, agent_id
@@ -235,7 +240,7 @@ async function updateProfile({ id, firstName, lastName, dateOfBirth, gender, ema
     //   address, city, state, country, postal, status, agent_id, updated_at;
     // `;
 
-    const result = await client.query(profileQuery.dynamicUpdate(fields), params);
+    const result = await client.query(await profileQuery.dynamicUpdate(fields), params);
     if (result.rowCount === 0) {
       throw new profileException.NoAffectedRowError();
     }
@@ -264,7 +269,7 @@ async function verifyProfile ({id, agentID}) {
     //   RETURNING id
     // `;
     await client.query('BEGIN')
-    const result = client.query(profileQuery.verifyProfileQuery, [id, agentID]);
+    const result = await client.query(profileQuery.verifyProfileQuery, [id, agentID]);
     if (result.rowCount === 0) {
       throw new Error('No rows affected');
     }
@@ -276,7 +281,6 @@ async function verifyProfile ({id, agentID}) {
   } finally {
     client.release();
   }
-
 }
 
 async function softDeleteProfile({id, agentID, deleteReason}) {

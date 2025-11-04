@@ -1,14 +1,84 @@
 import pg from "pg";
 import 'dotenv/config';
-const { Pool } = pg;
+import {
+  SecretsManagerClient,
+  GetSecretValueCommand,
+} from "@aws-sdk/client-secrets-manager";
+// import * as secretsClient from "./secrets";
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  // ssl: process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : false,
-  options: '-c search_path=profiles,public',
+const client = new SecretsManagerClient({
+  region: "ap-southeast-1",
 });
 
-export default pool;
+const secret_name = "itsatestdb";
+
+async function initPool() {
+  try {
+    const response = await client.send(
+      new GetSecretValueCommand({
+        SecretId: secret_name,
+        VersionStage: "AWSCURRENT", // VersionStage defaults to AWSCURRENT if unspecified
+      })
+    );
+  } catch (error) {
+    // For a list of exceptions thrown, see
+    // https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_GetSecretValue.html
+    throw error;
+  }
+
+  const secret = response.SecretString;
+  // const secret = JSON.parse(res.SecretString);
+
+  const pool = new Pool({
+    host: secret.host,
+    port: secret.port,
+    user: secret.username,
+    password: secret.password,
+    database: secret.dbname,
+    max: 10,
+    idleTimeoutMillis: 30000,
+    options: '-c search_path=profiles,public',
+  });
+  return pool;
+}
+
+export const dbPool = await initPool();
+// const { Pool } = pg;
+
+// const pool = new Pool({
+//   // connectionString: process.env.DATABASE_URL,
+//   // ssl: process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : false,
+//   options: '-c search_path=profiles,public',
+// });
+
+// export default pool;
+
+// Use this code snippet in your app.
+// If you need more information about configurations or implementing the sample code, visit the AWS docs:
+// https://docs.aws.amazon.com/sdk-for-javascript/v3/developer-guide/getting-started.html
+
+
+
+
+
+// let response;
+
+// try {
+//   response = await client.send(
+//     new GetSecretValueCommand({
+//       SecretId: secret_name,
+//       VersionStage: "AWSCURRENT", // VersionStage defaults to AWSCURRENT if unspecified
+//     })
+//   );
+// } catch (error) {
+//   // For a list of exceptions thrown, see
+//   // https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_GetSecretValue.html
+//   throw error;
+// }
+
+// const secret = response.SecretString;
+
+// Your code goes here
 
 
 // Schema??

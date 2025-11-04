@@ -36,7 +36,7 @@ router.post ("/createAgent", requireAuth, validate(schema.createAgentSchema), as
 router.get ("/findByID", requireAuth, validateQuery(schema.agentIdParams), async(req, res, next) => {
   try {
       const adminID = req.user?.id;
-      const agentID = req.validated
+      const agentID = req.validatedQuery;
 
       if (!adminID) {
         return res.status(403).json({ error: "Forbidden", message: "Missing adminID" });
@@ -63,7 +63,7 @@ router.get ("/all", requireAuth, validateQuery(schema.listAgentsQuery), async(re
       }
 
       const agents = await agentTX.getAllAgentByAdminID({
-        ...req.validated,
+        ...req.validatedQuery,
         adminID,
       });
 
@@ -137,7 +137,7 @@ router.get ("/search", requireAuth, validateQuery(schema.searchSchema), async(re
       }
 
       const agents = await agentTX.searchAgentWithAdminID({
-        ...req.validated, 
+        ...req.validatedQuery, 
         adminID,
       });
 

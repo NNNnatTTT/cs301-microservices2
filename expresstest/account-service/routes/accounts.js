@@ -98,7 +98,7 @@ router.get ("/all", requireAuth, validateQuery(schema.pageAllClientSchema), asyn
       }
 
       const clients = await accountTX.getAccountPagesByAgentID({
-        ...req.validated,
+        ...req.validatedQuery,
         agentID,
       });
 
