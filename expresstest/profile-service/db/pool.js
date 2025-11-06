@@ -20,26 +20,25 @@ async function initPool() {
         VersionStage: "AWSCURRENT", // VersionStage defaults to AWSCURRENT if unspecified
       })
     );
+    const secret = response.SecretString;
+    // const secret = JSON.parse(res.SecretString);
+
+    const pool = new Pool({
+      host: secret.host,
+      port: secret.port,
+      user: secret.username,
+      password: secret.password,
+      database: secret.dbname,
+      max: 10,
+      idleTimeoutMillis: 30000,
+      options: '-c search_path=profiles,public',
+    });
+    return pool;
   } catch (error) {
     // For a list of exceptions thrown, see
     // https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_GetSecretValue.html
     throw error;
   }
-
-  const secret = response.SecretString;
-  // const secret = JSON.parse(res.SecretString);
-
-  const pool = new Pool({
-    host: secret.host,
-    port: secret.port,
-    user: secret.username,
-    password: secret.password,
-    database: secret.dbname,
-    max: 10,
-    idleTimeoutMillis: 30000,
-    options: '-c search_path=profiles,public',
-  });
-  return pool;
 }
 
 export const dbPool = await initPool();
