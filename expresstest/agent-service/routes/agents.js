@@ -1,50 +1,46 @@
 import { Router } from "express";
-import pool from "../db/pool.js";
 import * as agentTX from "../db/tx.js"
 // import { publish } from "../queues/sqs.js";
 import { validate, validateParams, validateQuery } from "../middlewares/validate.js";
-import { requireAuth } from "../middlewares/auth.js";
+import { authenticateCognito, authorizeAdmin } from "../middlewares/auth.js";
 import * as schema from "../schemas/agents.schema.js";
 
 const router = Router();
 
-router.post ("/createAgent", requireAuth, validate(schema.createAgentSchema), async(req, res, next) => {
+router.use(authenticateCognito, authorizeAdmin)
+
+router.post("/", validate(schema.createAgentSchema), async(req, res, next) => {
   try {
-      const adminID = req.user?.id;
-      const role = req.user?.role;
+    const adminSub = req.user?.sub;
 
-      if (!adminID) {
-        return res.status(403).json({ error: "Forbidden", message: "Missing adminID" });
-      }
-
-      if (role !== 'admin') {
-        throw new Error ("Not admin");
-      }
-
-      const agentID = await agentTX.createAgent({
-        ...req.validated, 
-        adminID,
-      });
-
-      return res.status(201).json({ agentID });
-    } catch (e) {
-      next(e)
+    if (!adminSub) {
+      return res.status(403).json({ error: "Forbidden", message: "Missing adminSub" });
     }
+
+    const agentID = await agentTX.createAgent({
+      ...req.validated,
+      adminSub,
+    });
+
+    return res.status(201).json({ agentID });
+  } catch (e) {
+    next(e);
+  }
 });
 
 // /:agentID for param, otherwise blank for query
-router.get ("/findByID", requireAuth, validateQuery(schema.agentIdParams), async(req, res, next) => {
+router.get("/", validateQuery(schema.agentIdParams), async(req, res, next) => {
   try {
-      const adminID = req.user?.id;
+      const adminSub = req.user?.sub;
       const agentID = req.validatedQuery;
 
-      if (!adminID) {
-        return res.status(403).json({ error: "Forbidden", message: "Missing adminID" });
+      if (!adminSub) {
+        return res.status(403).json({ error: "Forbidden", message: "Missing adminSub" });
       }
 
-      const agent = await agentTX.getAgentByIDByAdminID({
-        agentID, 
-        adminID,
+      const agent = await agentTX.getAgentByIDByAdminSub({
+        agentID,
+        adminSub,
       });
 
       if (!agent) return res.status(404).json({ error: "NotFound" });
@@ -54,17 +50,17 @@ router.get ("/findByID", requireAuth, validateQuery(schema.agentIdParams), async
     }
 });
 
-router.get ("/all", requireAuth, validateQuery(schema.listAgentsQuery), async(req, res, next) => {
+router.get("/all", validateQuery(schema.listAgentsQuery), async(req, res, next) => {
   try {
-      const adminID = req.user?.id;
+      const adminSub = req.user?.sub;
 
-      if (!adminID) {
-        return res.status(403).json({ error: "Forbidden", message: "Missing adminID" });
+      if (!adminSub) {
+        return res.status(403).json({ error: "Forbidden", message: "Missing adminSub" });
       }
 
-      const agents = await agentTX.getAllAgentByAdminID({
+      const agents = await agentTX.getAllAgentByAdminSub({
         ...req.validatedQuery,
-        adminID,
+        adminSub,
       });
 
       if (!agents || agents.length === 0) return res.status(404).json({ error: "NotFound" });
@@ -74,13 +70,24 @@ router.get ("/all", requireAuth, validateQuery(schema.listAgentsQuery), async(re
     }
 });
 
-router.get ("/test/all", requireAuth, async(req, res, next) => {
+router.get("/test/all", async(req, res, next) => {
   try {
-      // const adminID = req.user?.id;
+      const agents = await agentTX.getAllAgent({});
 
-      // if (!adminID) {
-      //   return res.status(403).json({ error: "Forbidden", message: "Missing adminID" });
-      // }
+      if (!agents || agents.length === 0) return res.status(404).json({ error: "NotFound" });
+      return res.status(201).json({ agents });
+    } catch (e) {
+      next(e)
+    }
+});
+
+router.get("/testAdminSub/:adminSub", validateParams(schema.getAllAgentByAdminSub), async(req, res, next) => {
+  try {
+      const adminSub = req.user?.sub;
+
+      if (!adminSub) {
+        return res.status(403).json({ error: "Forbidden", message: "Missing adminSub" });
+      }
 
       const agents = await agentTX.getAllAgent({});
 
@@ -91,34 +98,17 @@ router.get ("/test/all", requireAuth, async(req, res, next) => {
     }
 });
 
-router.get ("/testAdminID/:adminID", requireAuth, validateParams(schema.getAllAgentByAdminID), async(req, res, next) => {
+router.get("/strict", validateQuery(schema.getschema), async(req, res, next) => {
   try {
-      const adminID = req.user?.id;
+      const adminSub = req.user?.sub;
 
-      if (!adminID) {
-        return res.status(403).json({ error: "Forbidden", message: "Missing adminID" });
+      if (!adminSub) {
+        return res.status(403).json({ error: "Forbidden", message: "Missing adminSub" });
       }
 
-      const agents = await agentTX.getAllAgent({});
-
-      if (!agents || agents.length === 0) return res.status(404).json({ error: "NotFound" });
-      return res.status(201).json({ agents });
-    } catch (e) {
-      next(e)
-    }
-});
-
-router.get ("/strict", requireAuth, validateQuery(schema.getschema), async(req, res, next) => {
-  try {
-      const adminID = req.user?.id;
-
-      if (!adminID) {
-        return res.status(403).json({ error: "Forbidden", message: "Missing adminID" });
-      }
-
-      const agents = await agentTX.strictGetAgentByAdminID({
-        ...req.validated, 
-        adminID,
+      const agents = await agentTX.strictGetAgentByAdminSub({
+        ...req.validated,
+        adminSub,
       });
 
       if (!agents || agents.length === 0) return res.status(404).json({ error: "NotFound" });
@@ -128,17 +118,17 @@ router.get ("/strict", requireAuth, validateQuery(schema.getschema), async(req, 
     }
 });
 
-router.get ("/search", requireAuth, validateQuery(schema.searchSchema), async(req, res, next) => {
+router.get("/search", validateQuery(schema.searchSchema), async(req, res, next) => {
   try {
-      const adminID = req.user?.id;
+      const adminSub = req.user?.sub;
 
-      if (!adminID) {
-        return res.status(403).json({ error: "Forbidden", message: "Missing adminID" });
+      if (!adminSub) {
+        return res.status(403).json({ error: "Forbidden", message: "Missing adminSub" });
       }
 
-      const agents = await agentTX.searchAgentWithAdminID({
-        ...req.validatedQuery, 
-        adminID,
+      const agents = await agentTX.searchAgentWithAdminSub({
+        ...req.validatedQuery,
+        adminSub,
       });
 
       if (!agents || agents.length === 0) return res.status(404).json({ error: "NotFound" });
@@ -148,17 +138,17 @@ router.get ("/search", requireAuth, validateQuery(schema.searchSchema), async(re
     }
 });
 
-router.get ("/loose", requireAuth, validateQuery(schema.getschema), async(req, res, next) => {
+router.get("/loose", validateQuery(schema.getschema), async(req, res, next) => {
   try {
-      const adminID = req.user?.id;
+      const adminSub = req.user?.sub;
 
-      if (!adminID) {
-        return res.status(403).json({ error: "Forbidden", message: "Missing adminID" });
+      if (!adminSub) {
+        return res.status(403).json({ error: "Forbidden", message: "Missing adminSub" });
       }
 
-      const agents = await agentTX.looseGetAgentByAdminID({
-        ...req.validated, 
-        adminID,
+      const agents = await agentTX.looseGetAgentByAdminSub({
+        ...req.validated,
+        adminSub,
       });
 
       if (!agents || agents.length === 0) return res.status(404).json({ error: "NotFound" });
@@ -168,17 +158,17 @@ router.get ("/loose", requireAuth, validateQuery(schema.getschema), async(req, r
     }
 });
 
-router.put ("/updateAgent", requireAuth, validate(schema.updateAgentSchema), async(req, res, next) => {
+router.put("/updateAgent", validate(schema.updateAgentSchema), async(req, res, next) => {
   try {
-      const adminID = req.user?.id;
+      const adminSub = req.user?.sub;
 
-      if (!adminID) {
-        return res.status(403).json({ error: "Forbidden", message: "Missing adminID" });
+      if (!adminSub) {
+        return res.status(403).json({ error: "Forbidden", message: "Missing adminSub" });
       }
 
-      const agentID = await agentTX.updateAgentByAdminID({
-        ...req.validated, 
-        adminID,
+      const agentID = await agentTX.updateAgentByAdminSub({
+        ...req.validated,
+        adminSub,
       });
 
       return res.status(201).json({ agentID });
@@ -187,17 +177,17 @@ router.put ("/updateAgent", requireAuth, validate(schema.updateAgentSchema), asy
     }
 });
 
-router.delete ("/deleteAgent", requireAuth, validate(schema.softDeleteSchema), async(req, res, next) => {
+router.delete("/deleteAgent", validate(schema.softDeleteSchema), async(req, res, next) => {
   try {
-      const adminID = req.user?.id;
+      const adminSub = req.user?.sub;
 
-      if (!adminID) {
-        return res.status(403).json({ error: "Forbidden", message: "Missing adminID" });
+      if (!adminSub) {
+        return res.status(403).json({ error: "Forbidden", message: "Missing adminSub" });
       }
 
       const agentID = await agentTX.softDeleteAgent({
-        ...req.validated, 
-        adminID,
+        ...req.validated,
+        adminSub,
       });
 
       return res.status(201).json({ agentID });

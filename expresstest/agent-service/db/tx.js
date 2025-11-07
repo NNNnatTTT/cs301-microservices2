@@ -3,17 +3,17 @@ import * as cognito from "../cognito/services/cognito.service.js";
 // import * as agentQuery from "./query.js";
 // import * as agentException from "../utils/exceptions.js";
 
-async function isElligible({adminID, agentID}) {
-  console.log({adminID, agentID});
+async function isElligible({ adminSub, agentID }) {
+  console.log({ adminSub, agentID });
   try {
     const query = `
       SELECT EXISTS (
-        SELECT 1 FROM agents.agent_list WHERE agent_id = $1 AND admin_id = $2
+        SELECT 1 FROM agents.agent_list WHERE agent_id = $1 AND admin_sub = $2
         AND deleted_at IS NULL
       ) AS eligible;
     `;
 
-    const {rows } = await pool.query(query, [agentID, adminID]);
+    const {rows } = await pool.query(query, [agentID, adminSub]);
     return !!rows[0].eligible;
   } catch (e) {
     console.error('Error reading agent: ', e)
@@ -21,17 +21,17 @@ async function isElligible({adminID, agentID}) {
   }
 }
 
-async function createAgent({ firstName, lastName, email, adminID }) {
+async function createAgent({ firstName, lastName, email, adminSub }) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
     const insertQuery = `
-      INSERT INTO agents.agent_list (first_name, last_name, email, role, admin_id)
+      INSERT INTO agents.agent_list (first_name, last_name, email, role, admin_sub)
       VALUES ($1, $2, $3, $4, $5)
       RETURNING agent_id;
     `;
-    const values = [firstName, lastName, email, "agent", adminID];
+    const values = [firstName, lastName, email, "agent", adminSub];
     const result = await client.query(insertQuery, values);
     const createdID = result.rows[0].agent_id;
     
@@ -105,17 +105,17 @@ async function getAllAgent({ agentID }) {
   }
 }
 
-async function getAgentByIDByAdminID({ adminID, agentID }) {
+async function getAgentByIDByAdminSub({ adminSub, agentID }) {
   const client = await pool.connect();
   try {
     const selectByIDQuery = `
       SELECT agent_id, first_name, last_name, email, role
       FROM agents.agent_list
-      WHERE agent_id = $1 AND admin_id = $2
+      WHERE agent_id = $1 AND admin_sub = $2
       AND deleted_at IS NULL;
     `;
 
-    const result = await client.query(selectByIDQuery, [agentID, adminID]);
+    const result = await client.query(selectByIDQuery, [agentID, adminSub]);
     // if (rows.length === 0) throw new NotFoundError("Agent not found for this admin");
     // if (rows.length === 0) throw new NotFoundError(); // Will default msg in class print?
 
@@ -129,15 +129,15 @@ async function getAgentByIDByAdminID({ adminID, agentID }) {
 }
 
 // Only returns matches in first column
-async function looseGetAgentByAdminID({ adminID, firstName, lastName, email }) {
-  // if (!(await isElligible(adminID, agentID))) throw new Error ('Not Elllgible');
+async function looseGetAgentByAdminSub({ adminSub, firstName, lastName, email }) {
+  // if (!(await isElligible(adminSub, agentID))) throw new Error ('Not Elllgible');
   const client = await pool.connect();
   try {
 
     const selectByIDQuery = `
       SELECT agent_id, first_name, last_name, email, role
       FROM agents.agent_list
-      WHERE admin_id = $4
+      WHERE admin_sub = $4
         AND deleted_at IS NULL AND (
               ($1::text   IS NOT NULL AND first_name ILIKE $1::text)
           OR ($2::text    IS NOT NULL AND last_name  ILIKE $2::text)
@@ -151,7 +151,7 @@ async function looseGetAgentByAdminID({ adminID, firstName, lastName, email }) {
       firstName ? `%${firstName}%` : null,
       lastName  ? `%${lastName }%` : null,
       email ?? null,
-      adminID,
+      adminSub,
     ]);
     
     return rows || null;
@@ -163,14 +163,14 @@ async function looseGetAgentByAdminID({ adminID, firstName, lastName, email }) {
   }
 }
 
-async function searchAgentWithAdminID({ adminID, searchValue }) {
+async function searchAgentWithAdminSub({ adminSub, searchValue }) {
   const client = await pool.connect();
   try {
 
     const selectByIDQuery = `
       SELECT agent_id, first_name, last_name, email, role
       FROM agents.agent_list
-      WHERE admin_id = $2
+      WHERE admin_sub = $2
         AND deleted_at IS NULL AND (
               (first_name ILIKE $1::text)
           OR (last_name  ILIKE $1::text)
@@ -181,7 +181,7 @@ async function searchAgentWithAdminID({ adminID, searchValue }) {
 
     const { rows } = await client.query(selectByIDQuery, [
       searchValue ? `%${searchValue}%` : null,
-      adminID,
+      adminSub,
     ]);
     
     return rows || null;
@@ -193,21 +193,21 @@ async function searchAgentWithAdminID({ adminID, searchValue }) {
   }
 }
 
-async function strictGetAgentByAdminID({ adminID, firstName, lastName, email }) {
+async function strictGetAgentByAdminSub({ adminSub, firstName, lastName, email }) {
   const client = await pool.connect();
   try {
 
     const selectByIDQuery = `
       SELECT agent_id, first_name, last_name, email, role
       FROM agents.agent_list
-      WHERE admin_id = $4 AND deleted_at IS NULL AND (
+      WHERE admin_sub = $4 AND deleted_at IS NULL AND (
         ($1::text         IS NOT NULL AND first_name ILIKE $1::text)
           OR ($2::text    IS NOT NULL AND last_name ILIKE $2::text)
           OR ($3::citext  IS NOT NULL AND email = $3::citext)
           );
     `;
 
-    const result = await client.query(selectByIDQuery, [firstName ?? null, lastName ?? null, email ?? null, adminID]);
+    const result = await client.query(selectByIDQuery, [firstName ?? null, lastName ?? null, email ?? null, adminSub]);
     
     return result.rows[0] || null;
   } catch (e) {
@@ -219,18 +219,18 @@ async function strictGetAgentByAdminID({ adminID, firstName, lastName, email }) 
 }
 
 // 1 page 20 clients
-async function getAllAgentByAdminID({ adminID, limit, offset }) {
+async function getAllAgentByAdminSub({ adminSub, limit, offset }) {
   const client = await pool.connect();
   try {
     const selectByIDQuery = `
       SELECT agent_id, first_name, last_name, email, role
       FROM agents.agent_list
-      WHERE admin_id = $1 AND deleted_at IS NULL 
+      WHERE admin_sub = $1 AND deleted_at IS NULL 
       ORDER BY created_at DESC, agent_id DESC
       LIMIT $2 OFFSET $3;
     `;
 
-    const {rows} = await client.query(selectByIDQuery, [adminID, limit, offset]);
+    const {rows} = await client.query(selectByIDQuery, [adminSub, limit, offset]);
 
     return rows || null;
   } catch (e) {
@@ -246,10 +246,10 @@ function logQuery(sql, params) {
   console.log({ numPlaceholders, paramsLength: params.length, params, preview: sql.slice(0, 120) });
 }
 
-async function updateAgentByAdminID({ adminID, agentID, firstName, lastName, email}) {
+async function updateAgentByAdminSub({ adminSub, agentID, firstName, lastName, email}) {
   const client = await pool.connect();
   try {
-    const ok = await isElligible({ adminID, agentID});
+    const ok = await isElligible({ adminSub, agentID});
     if (!ok) throw new Error('Not Elligible');
     
     const fields = [];
@@ -271,7 +271,7 @@ async function updateAgentByAdminID({ adminID, agentID, firstName, lastName, ema
       return null;
     } 
 
-    const params = [agentID, adminID, ...values];
+    const params = [agentID, adminSub, ...values];
 
     await client.query('BEGIN');
     const sql = `
@@ -279,7 +279,7 @@ async function updateAgentByAdminID({ adminID, agentID, firstName, lastName, ema
       SET ${fields.join(', ')},
           updated_at = now()
       WHERE agent_id = $1
-        AND admin_id = $2
+        AND admin_sub = $2
         AND deleted_at IS NULL
       RETURNING agent_id, first_name, last_name, email, role, created_at, updated_at;
     `;
@@ -298,20 +298,20 @@ async function updateAgentByAdminID({ adminID, agentID, firstName, lastName, ema
   }
 }
 
-async function hardDeleteByAdminID({adminID, agentID}) {
-  if (!(await isElligible(adminID, agentID))) throw new Error ('Not Elllgible');
+async function hardDeleteByAdminSub({adminSub, agentID}) {
+  if (!(await isElligible(adminSub, agentID))) throw new Error ('Not Elllgible');
 
   const client = await pool.connect();
   try {
     const sql = `
       DELETE FROM agents.agent_list
       WHERE agent_id = $1
-      AND admin_id = $2 
+      AND admin_sub = $2 
       AND deleted_at IS NULL
       RETURNING agent_id
     `;
 
-    const result = await pool.query(sql, [agentID, adminID]);
+    const result = await pool.query(sql, [agentID, adminSub]);
 
     if (result.rowCount === 0) {
       // Either dont exist, or admin dont own it
@@ -326,21 +326,21 @@ async function hardDeleteByAdminID({adminID, agentID}) {
   }
 }
 
-async function softDeleteAgent({adminID, agentID, deleteReason}) {
+async function softDeleteAgent({adminSub, agentID, deleteReason}) {
   const client = await pool.connect();
   try {
-    const ok = await isElligible({ adminID, agentID, client});
+    const ok = await isElligible({ adminSub, agentID });
     if (!ok) throw new Error('Not Elligible');
     const sql = `
       UPDATE agents.agent_list
       SET deleted_by = $2, deleted_at = now(), updated_at = now(), delete_reason = $3
       WHERE agent_id = $1
-        AND admin_id = $2
+        AND admin_sub = $2
         AND deleted_at IS NULL
       RETURNING agent_id, email, deleted_at
     `;
     await client.query('BEGIN');
-    const softDeleteResult = await client.query(sql, [agentID, adminID, deleteReason]);
+    const softDeleteResult = await client.query(sql, [agentID, adminSub, deleteReason]);
     const result = [softDeleteResult.rows[0].agent_id, softDeleteResult.rows[0].deleted_at];
     if (softDeleteResult.rowCount === 0) {
       throw new Error('Soft delete failed, not found ');
@@ -367,10 +367,10 @@ async function softDeleteAgent({adminID, agentID, deleteReason}) {
 // ESM: export {}
 export { createAgent,
         getAgentByID, getAllAgent, 
-        getAgentByIDByAdminID, getAllAgentByAdminID, 
-        looseGetAgentByAdminID, strictGetAgentByAdminID,
-        searchAgentWithAdminID,
-        updateAgentByAdminID, 
+        getAgentByIDByAdminSub, getAllAgentByAdminSub, 
+        looseGetAgentByAdminSub, strictGetAgentByAdminSub,
+        searchAgentWithAdminSub,
+        updateAgentByAdminSub, 
         softDeleteAgent, 
-        hardDeleteByAdminID
+        hardDeleteByAdminSub
       };
