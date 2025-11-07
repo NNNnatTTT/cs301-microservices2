@@ -1,5 +1,5 @@
 const insertAgentQuery = `
-    INSERT INTO agents.agent_list (first_name, last_name, email, role, admin_id)
+    INSERT INTO agents.agent_list (first_name, last_name, email, role, admin_sub)
     VALUES ($1, $2, $3, $4, $5)
     RETURNING agent_id;
     `;
@@ -23,19 +23,19 @@ const devSelectAllQuery = `
     FROM agents.agent_list;
     `;
 
-const selectByIDAdminIDQuery = `
+const selectByIDAdminSubQuery = `
     SELECT agent_id, first_name, last_name, email, role
     FROM agents.agent_list
     WHERE
         agent_id = $1 
-        AND admin_id = $2
+        AND admin_sub = $2
         AND deleted_at IS NULL;
     `;
-const pageByAdminIDQuery = `
+const pageByAdminSubQuery = `
     SELECT agent_id, first_name, last_name, email, role
     FROM agents.agent_list
     WHERE 
-        admin_id = $1 
+        admin_sub = $1 
         AND deleted_at IS NULL 
     ORDER BY 
         created_at DESC, 
@@ -46,7 +46,7 @@ const searchAgentQuery = `
     SELECT agent_id, first_name, last_name, email, role
     FROM agents.agent_list
     WHERE 
-        admin_id = $2
+        admin_sub = $2
         AND deleted_at IS NULL AND (
             (first_name ILIKE $1::text)
             OR (last_name  ILIKE $1::text)
@@ -62,7 +62,7 @@ async function buildSearchQuery ({fields}) {
             updated_at = now()
         WHERE 
             agent_id = $1
-            AND admin_id = $2
+            AND admin_sub = $2
             AND deleted_at IS NULL
         RETURNING agent_id, first_name, last_name, email, role, created_at, updated_at;
     `;
@@ -82,7 +82,7 @@ const softDeleteQuery = `
         delete_reason = $3
     WHERE 
         agent_id = $1
-        AND admin_id = $2
+        AND admin_sub = $2
         AND deleted_at IS NULL
     RETURNING agent_id, email, deleted_at;
     `;
@@ -95,7 +95,7 @@ const hardDeleteQuery = `
     DELETE FROM agents.agent_list
     WHERE 
         agent_id = $1
-        AND admin_id = $2 
+        AND admin_sub = $2 
         AND deleted_at IS NULL
     RETURNING agent_id;
     `;
@@ -103,7 +103,7 @@ const hardDeleteQuery = `
 export {
     insertAgentQuery, insertCogSubQuery,
     devSelectByIDQuery, devSelectAllQuery,
-    selectByIDAdminIDQuery, pageByAdminIDQuery,
+    selectByIDAdminSubQuery, pageByAdminSubQuery,
     searchAgentQuery,
     buildSearchQuery, updateCogQuery,
     softDeleteQuery, disableCogQuery,

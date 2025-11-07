@@ -2,7 +2,6 @@ import express from "express";
 import helmet from "helmet";
 import pool from "./db/pool.js";
 import agentsRouter from "./routes/agents.js"; 
-import { requireAuth } from "./middlewares/auth.js";
 
 import 'dotenv/config';
 
@@ -25,7 +24,7 @@ app.get("/allz", async (_req, res) => {
 app.get("/", (req, res) => res.send("API is running"));
 
 // Actual
-app.use("/v1/agent", requireAuth, agentsRouter);
+app.use("/v1/agents", agentsRouter);
 
 // Global Error Handler
 app.use((err, _req, res, _next) => {

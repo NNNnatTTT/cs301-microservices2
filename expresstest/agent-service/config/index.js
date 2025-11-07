@@ -14,17 +14,9 @@ export const config = {
     jwksUri: process.env.COGNITO_JWKS_URI,
     issuer: process.env.COGNITO_ISSUER,
   },
-  jwt: {
-    accessSecret: process.env.JWT_ACCESS_SECRET || 'dev_access_secret',
-    accessExpiresIn: process.env.JWT_ACCESS_EXPIRES || '15m',
-    refreshSecret: process.env.JWT_REFRESH_SECRET || 'dev_refresh_secret',
-    refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES || '7d',
-  },
   rateLimit: {
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000', 10),
     max: parseInt(process.env.RATE_LIMIT_MAX || '100', 10),
   },
   corsOrigin: process.env.CORS_ORIGIN || '*',
-  rootAdminEmail: process.env.ROOT_ADMIN_EMAIL || 'admin@example.com',
-  // rootAdminPassword: process.env.ROOT_ADMIN_PASSWORD || 'ChangeMe!123'
 };

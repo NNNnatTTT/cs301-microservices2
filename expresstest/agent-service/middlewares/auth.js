@@ -1,23 +1,54 @@
-import jwt from "jsonwebtoken";
+import createError from 'http-errors';
+import jwt from 'jsonwebtoken';
+import jwksClient from 'jwks-rsa';
+import { config } from '../config/index.js';
 
-export function requireAuthREAL(req, res, next) {
-  const auth = req.headers.authorization || "";
-  const token = auth.startsWith("Bearer ") ? auth.slice(7) : null;
-  if (!token) return res.status(401).json({ error: "Unauthorized" });
+const client = jwksClient({ jwksUri: config.cognito.jwksUri });
 
-  try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET);
-    // e.g. payload = { id: "...", role: "admin" }
-    req.user = payload;
-    next();
-  } catch {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
+function getKey(header, cb) {
+  client.getSigningKey(header.kid, (err, key) => {
+    if (err) return cb(err);
+    const signingKey = key.getPublicKey();
+    cb(null, signingKey);
+  });
 }
 
-// (TEST ONLY)
-export function requireAuth(req, _res, next) {
-  req.user = { id: "11111111-1111-1111-1111-111111111111", role: "admin" };
+export function authenticateCognito(req, _res, next) {
+  const header = req.headers['authorization'];
+  if (!header) return next(createError(401, 'Missing Authorization header'));
+
+  const [type, token] = header.split(' ');
+  if (type !== 'Bearer' || !token)
+    return next(createError(401, 'Invalid Authorization header'));
+
+  jwt.verify(
+    token,
+    getKey,
+    {
+      algorithms: ['RS256'],
+      issuer: config.cognito.issuer,
+      // audience: config.cognito.appClientId, // not needed for access tokens
+    },
+    (err, decoded) => {
+      if (err) return next(createError(401, 'Invalid or expired token'));
+
+      // Ensure token is an access token (not ID token)
+      if (decoded.token_use !== 'access') {
+        return next(createError(401, 'Invalid token type'));
+      }
+
+      // Attach decoded payload (sub, groups, etc.) to request
+      req.user = decoded;
+      next();
+    },
+  );
+}
+
+// Admin only (by cognito's group)
+export function authorizeAdmin(req, _res, next) {
+  const groups = req.user?.['cognito:groups'] || [];
+  if (!groups.includes('admin')) {
+    return next(createError(403, 'Admin only'));
+  }
   next();
 }
-

@@ -86,7 +86,7 @@ CREATE TABLE IF NOT EXISTS agent_list (
   last_name  text        NOT NULL,
   email      citext      NOT NULL UNIQUE,
   role       text        NOT NULL DEFAULT 'agent' CHECK (role = 'agent'),
-  admin_id   uuid        NOT NULL REFERENCES admins(id) ON DELETE RESTRICT,
+  admin_sub   text        NOT NULL ON DELETE RESTRICT,
   cognito_sub text       NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
@@ -95,8 +95,8 @@ CREATE TABLE IF NOT EXISTS agent_list (
   delete_reason text
 );
 
-CREATE INDEX IF NOT EXISTS idx_agent_list_admin_created_id
-  ON agent_list (admin_id, created_at DESC, agent_id DESC)
+CREATE INDEX IF NOT EXISTS idx_agent_list_admin_created_sub
+  ON agent_list (admin_sub, created_at DESC, agent_id DESC)
   WHERE deleted_at IS NULL;
 
 GRANT CONNECT ON DATABASE agents_db TO service_user;

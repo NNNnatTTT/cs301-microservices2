@@ -27,7 +27,7 @@ export default pool;
 //   last_name          text        NOT NULL,
 //   email              citext      NOT NULL UNIQUE,
 //   role               text        NOT NULL CHECK (role IN ('agent')),
-//   admin_id           uuid        NOT NULL REFERENCES admins(id) ON DELETE RESTRICT,
+//   admin_sub           text        NOT NULL ON DELETE RESTRICT,
 //   created_at         timestamptz NOT NULL DEFAULT now()
 //   deleted_at         timestamptz
 //   deleted_by         uuid
