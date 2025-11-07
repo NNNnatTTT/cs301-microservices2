@@ -3,21 +3,21 @@ const isEligiblequery = `
         SELECT 1 FROM profiles.profile_list 
         WHERE 
             id = $1 
-            AND agent_id = $2
+            AND agent_sub = $2
             AND deleted_at IS NULL
     ) AS eligible;
 `;
 
 const insertProfileQuery = `
     INSERT INTO profiles.profile_list (first_name, last_name, date_of_birth, gender, email, phone_number, 
-    address, city, state, country, postal, status, agent_id)
+    address, city, state, country, postal, status, agent_sub)
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
     RETURNING id;
 `;
 
 const devSelectByIDQuery = `
     SELECT id, first_name, last_name, date_of_birth, gender, email, phone_number, 
-    address, city, state, country, postal, status, agent_id
+    address, city, state, country, postal, status, agent_sub
     FROM profiles.profile_list
     WHERE 
         id = $1;
@@ -25,39 +25,39 @@ const devSelectByIDQuery = `
 
 const devSelectAllQuery = `
     SELECT id, first_name, last_name, date_of_birth, gender, email, phone_number, 
-    address, city, state, country, postal, status, agent_id
+    address, city, state, country, postal, status, agent_sub
     FROM profiles.profile_list
 `;
 
-const selectByIDAgentIDQuery = `
+const selectByIDagentSUBQuery = `
     SELECT id, first_name, last_name, date_of_birth, gender, email, phone_number, 
-    address, city, state, country, postal, status, agent_id
+    address, city, state, country, postal, status, agent_sub
     FROM profiles.profile_list
     WHERE 
         id = $1 
-        AND agent_id = $2;
+        AND agent_sub = $2;
 `;
 
-const pageByAgentIDQuery = `
+const pageByagentSUBQuery = `
     SELECT id, first_name, last_name, date_of_birth, gender, email, phone_number, 
-    address, city, state, country, postal, status, agent_id
+    address, city, state, country, postal, status, agent_sub
     FROM profiles.profile_list
     WHERE 
-        agent_id = $1 
+        agent_sub = $1 
         AND deleted_at IS NULL
     ORDER BY 
         created_at DESC, 
-        agent_id DESC
+        agent_sub DESC
     LIMIT $2 OFFSET $3;
 `;
 
 const searchQuery = `
     SELECT id, first_name, last_name, date_of_birth, gender, email, phone_number, 
-    address, city, state, country, postal, status, agent_id
+    address, city, state, country, postal, status, agent_sub
     FROM 
         profiles.profile_list
     WHERE 
-        agent_id = $2
+        agent_sub = $2
         AND deleted_at IS NULL 
         AND (
                 (first_name       ILIKE $1::text)
@@ -72,10 +72,10 @@ const searchQuery = `
         )
     ORDER BY 
         created_at DESC, 
-        agent_id DESC
+        agent_sub DESC
     LIMIT $3 OFFSET $4;
 `;
-// ORDER BY created_at DESC, agent_id DESC LIMIT 10;
+// ORDER BY created_at DESC, agent_sub DESC LIMIT 10;
 
 async function dynamicUpdate(fields) {
     const updateQuery = `
@@ -85,10 +85,10 @@ async function dynamicUpdate(fields) {
             updated_at = now()
         WHERE 
             id = $1
-            AND agent_id = $2
+            AND agent_sub = $2
             AND deleted_at IS NULL
         RETURNING id, first_name, last_name, date_of_birth, gender, email, phone_number, 
-        address, city, state, country, postal, status, agent_id, updated_at;
+        address, city, state, country, postal, status, agent_sub, updated_at;
     `;
     // console.log('Generated SQL:\n', updateQuery);
     return updateQuery;
@@ -101,7 +101,7 @@ const verifyProfileQuery = `
         updated_at = now()
     WHERE 
         id = $1
-        AND agent_id = $2
+        AND agent_sub = $2
         AND deleted_at IS NULL
     RETURNING id;
 `;
@@ -115,7 +115,7 @@ const softDeleteQuery = `
         delete_reason = $3
     WHERE 
         id = $1
-        AND agent_id = $2
+        AND agent_sub = $2
         AND deleted_at IS NULL
     RETURNING id, deleted_at
 `;
@@ -124,7 +124,7 @@ export {
     isEligiblequery,
     insertProfileQuery,
     devSelectByIDQuery, devSelectAllQuery,
-    selectByIDAgentIDQuery, pageByAgentIDQuery,
+    selectByIDagentSUBQuery, pageByagentSUBQuery,
     searchQuery,
     dynamicUpdate, verifyProfileQuery,
     softDeleteQuery

@@ -1,12 +1,12 @@
 // import pool from "./pool.js";
-import { initDB } from "./pool.js";
+import { dbPool } from "./pool.js";
 import * as profileQuery from "./query.js";
 import * as profileException from "../utils/exceptions.js";
 
-const pool = await initDB();
+const pool = dbPool;
 
-async function isElligible({agentID, id}) {
-  console.log(agentID, id);
+async function isElligible({agentSUB, id}) {
+  console.log(agentSUB, id);
   try {
     // const profileQuery.isEligiblequery = `
     //   SELECT EXISTS (
@@ -15,7 +15,7 @@ async function isElligible({agentID, id}) {
     //   ) AS eligible;
     // `;
 
-    const {rows } = await pool.query(profileQuery.isEligiblequery, [id, agentID]);
+    const {rows } = await pool.query(profileQuery.isEligiblequery, [id, agentSUB]);
     if (rows.length === 0) throw new profileException.NotFoundError();
     return !!rows[0].eligible;
   } catch (e) {
@@ -26,7 +26,7 @@ async function isElligible({agentID, id}) {
 }
 
 async function createProfile({firstName, lastName, dateOfBirth, gender, email, phoneNumber, 
-      address, city, state, country, postal, status, agentID }) {
+      address, city, state, country, postal, status, agentSUB }) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -39,7 +39,7 @@ async function createProfile({firstName, lastName, dateOfBirth, gender, email, p
     // `;
 
     const values = [firstName, lastName, dateOfBirth, gender, email, phoneNumber, 
-                    address, city, state, country, postal, status, agentID ];
+                    address, city, state, country, postal, status, agentSUB ];
     const result = await client.query(profileQuery.insertProfileQuery, values);
 
     const profileID = result.rows[0].id;
@@ -99,10 +99,10 @@ async function getAllProfiles({ id }) {
   }
 }
 
-async function getProfileByIDagentID({id, agentID}) {
+async function getProfileByIDagentSUB({id, agentSUB}) {
   const client = await pool.connect();
   try {
-    const ok = await isElligible({ agentID, id});
+    const ok = await isElligible({ agentSUB, id});
     if (!ok) throw new profileException.ForbiddenError();
     // const selectByIDQuery = `
     //   SELECT id, first_name, last_name, date_of_birth, gender, email, phone_number, 
@@ -111,7 +111,7 @@ async function getProfileByIDagentID({id, agentID}) {
     //   WHERE id = $1 AND agent_id = $2;
     // `;
 
-    const result = await client.query(profileQuery.selectByIDAgentIDQuery, [id, agentID]);
+    const result = await client.query(profileQuery.selectByIDagentSUBQuery, [id, agentSUB]);
     
     return result.rows[0] || null;
   } catch (e) {
@@ -122,7 +122,7 @@ async function getProfileByIDagentID({id, agentID}) {
   }
 }
 
-async function getProfilePagesByAgentID({agentID, limit, offset}) {
+async function getProfilePagesByagentSUB({agentSUB, limit, offset}) {
   const client = await pool.connect();
   try {
     // const selectByIDQuery = `
@@ -134,7 +134,7 @@ async function getProfilePagesByAgentID({agentID, limit, offset}) {
     //   LIMIT $2 OFFSET $3;
     // `;
 
-    const {rows} = await client.query(profileQuery.pageByAgentIDQuery, [agentID, limit, offset]);
+    const {rows} = await client.query(profileQuery.pageByagentSUBQuery, [agentSUB, limit, offset]);
     
     return rows || null;
   } catch (e) {
@@ -146,7 +146,7 @@ async function getProfilePagesByAgentID({agentID, limit, offset}) {
 }
 
 
-async function searchProfile ({agentID, searchValue, limit, offset}) {
+async function searchProfile ({agentSUB, searchValue, limit, offset}) {
   const client = await pool.connect();
   try {
     console.log(searchValue);
@@ -175,7 +175,7 @@ async function searchProfile ({agentID, searchValue, limit, offset}) {
 
     const { rows } = await client.query(profileQuery.searchQuery, [
       searchValue ? `%${searchValue}%` : null,
-      agentID, limit, offset
+      agentSUB, limit, offset
     ]);
     if (rows.length === 0) {
       throw new profileException.NotFoundError();
@@ -191,10 +191,10 @@ async function searchProfile ({agentID, searchValue, limit, offset}) {
 }
 
 async function updateProfile({ id, firstName, lastName, dateOfBirth, gender, email, phoneNumber, 
-      address, city, state, country, postal, status, newAgentID, agentID}) {
+      address, city, state, country, postal, status, newAgentID, agentSUB}) {
   const client = await pool.connect();
   try {
-    const ok = await isElligible({ agentID, id});
+    const ok = await isElligible({ agentSUB, id});
     if (!ok) throw new profileException.ForbiddenError();
     
     const fields = [];
@@ -226,7 +226,7 @@ async function updateProfile({ id, firstName, lastName, dateOfBirth, gender, ema
       return null;
     } 
 
-    const params = [id, agentID, ...values];
+    const params = [id, agentSUB, ...values];
 
     await client.query('BEGIN');
     // const sql = `
@@ -254,10 +254,10 @@ async function updateProfile({ id, firstName, lastName, dateOfBirth, gender, ema
   }
 }
 
-async function verifyProfile ({id, agentID}) {
+async function verifyProfile ({id, agentSUB}) {
   const client = await pool.connect();
   try {
-    const ok = await isElligible({ id, agentID, client});
+    const ok = await isElligible({ id, agentSUB, client});
     if (!ok) throw new Error('Not Elligible');
 
     // const verifySQL = `
@@ -269,7 +269,7 @@ async function verifyProfile ({id, agentID}) {
     //   RETURNING id
     // `;
     await client.query('BEGIN')
-    const result = await client.query(profileQuery.verifyProfileQuery, [id, agentID]);
+    const result = await client.query(profileQuery.verifyProfileQuery, [id, agentSUB]);
     if (result.rowCount === 0) {
       throw new Error('No rows affected');
     }
@@ -283,10 +283,10 @@ async function verifyProfile ({id, agentID}) {
   }
 }
 
-async function softDeleteProfile({id, agentID, deleteReason}) {
+async function softDeleteProfile({id, agentSUB, deleteReason}) {
   const client = await pool.connect();
   try {
-    const ok = await isElligible({ id, agentID, client});
+    const ok = await isElligible({ id, agentSUB, client});
     if (!ok) throw new Error('Not Elligible');
     // const sql = `
     //   UPDATE profiles.profile_list
@@ -297,7 +297,7 @@ async function softDeleteProfile({id, agentID, deleteReason}) {
     //   RETURNING id, deleted_at
     // `;
     await client.query('BEGIN');
-    const result = await client.query(profileQuery.softDeleteQuery, [id, agentID, deleteReason]);
+    const result = await client.query(profileQuery.softDeleteQuery, [id, agentSUB, deleteReason]);
 
     if (result.rowCount === 0) {
       throw new Error('Soft delete failed, not found ');
@@ -319,7 +319,7 @@ async function softDeleteProfile({id, agentID, deleteReason}) {
 // ESM: export {}
 export { createProfile,
         getProfileByID, getAllProfiles, 
-        getProfileByIDagentID, getProfilePagesByAgentID,
+        getProfileByIDagentSUB, getProfilePagesByagentSUB,
         searchProfile,
         updateProfile, verifyProfile,
         softDeleteProfile, 

@@ -3,6 +3,8 @@ import {
     GetSecretValueCommand,
 } from "@aws-sdk/client-secrets-manager";
 import pg from "pg";
+import format from 'pg-format';
+
 
 // const { Client } = require('pg');
 const { Pool } = pg;
@@ -50,14 +52,14 @@ async function bootstrapPool(secret, dbName){
     return pool;
 }
 
-async function tablePool(secret, serviceUser, servicePW, dbName){
+async function tablePool(secret, dbName){
     const pool = new Pool({
             host: secret.host,
             // host: ,
             port: secret.port,
             // port: 5432,
-            user: serviceUser,
-            password: servicePW,
+            user: 'service_user',
+            password: 'user_password',
             database: dbName,
             max: 10,
             idleTimeoutMillis: 30000,
@@ -88,12 +90,123 @@ async function assertTrue(client, sql, ctx) {
   console.log(`✅ ${ctx}`);
 }
 
+async function createDB(dbName, masterClient) {
+    try {
+        await masterClient.query('SELECT pg_advisory_lock(hashtext($1))', [dbName]);
+
+        const { rows } = await masterClient.query(
+            'SELECT 1 FROM pg_database WHERE datname = $1',
+            [dbName]
+        );
+        if (rows.length === 0) {
+            // IMPORTANT: identifiers (database names) can’t be parameterized.
+            // Use pg-format %I to quote safely, or whitelist.
+            console.log("Creating database ", dbName);
+            const sql = format('CREATE DATABASE %I', dbName);
+            await masterClient.query(sql);
+            console.log("Created database ", dbName);
+        } else {
+            console.log("Database exists: ", dbName);
+        }
+    } catch (e) {
+        if (e.code !== '42P04') throw e;
+    } finally {
+        // Release advisory lock if taken
+        try { await masterClient.query('SELECT pg_advisory_unlock(hashtext($1))', [dbName]); } catch (_) {}
+        // client.release();
+    }
+}
+
+async function initProfilesDB(serviceClient) {
+    try {
+        // await serviceClient.query(`
+        //     DO $$
+        //     BEGIN
+        //         IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'profiles_user') THEN
+        //             CREATE ROLE profiles_user WITH LOGIN PASSWORD 'profiles_user_password';
+        //         END IF;
+        //     END $$ LANGUAGE plpgsql;
+        //     `);
+        await serviceClient.query(`CREATE SCHEMA IF NOT EXISTS profiles;`);
+        await assertTrue(serviceClient,
+            `SELECT EXISTS(SELECT 1 FROM pg_namespace WHERE nspname='profiles') AS ok`,
+            "profiles schema exists");
+
+        await serviceClient.query(`SET search_path TO profiles, public;`);
+        await serviceClient.query(`
+            DO $$
+                BEGIN
+                IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'gender_enum') THEN
+                    CREATE TYPE gender_enum AS ENUM ('M', 'F');
+                END IF;
+
+                IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'status_enum') THEN
+                    CREATE TYPE status_enum AS ENUM ('Active', 'Inactive', 'Disabled');
+                END IF;
+            END$$;
+
+            CREATE EXTENSION IF NOT EXISTS citext;
+            CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+            CREATE TABLE IF NOT EXISTS profile_list (
+                id                 uuid                PRIMARY KEY DEFAULT gen_random_uuid(),
+                first_name         text                NOT NULL,
+                last_name          text                NOT NULL,
+                date_of_birth      date                NOT NULL,
+                gender             gender_enum         NOT NULL,
+                email              citext              NOT NULL,
+                phone_number       text                NOT NULL,
+                address            text                NOT NULL CHECK (char_length(address)  BETWEEN 5 AND 100),
+                city               text                NOT NULL CHECK (char_length(city)     BETWEEN 2 AND 50),
+                state              text                NOT NULL CHECK (char_length(state)    BETWEEN 2 AND 50),
+                country            text                NOT NULL CHECK (char_length(country)  BETWEEN 2 AND 50),
+                postal             text                NOT NULL CHECK (char_length(postal)   BETWEEN 4 AND 10),
+                status             status_enum         NOT NULL DEFAULT 'Inactive',
+                agent_sub          text                NOT NULL,
+                created_at         timestamptz         NOT NULL DEFAULT now(),
+                updated_at         timestamptz         NOT NULL DEFAULT now(),
+                deleted_at         timestamptz,
+                deleted_by         uuid,
+                delete_reason      text,
+                CONSTRAINT phone_format CHECK (phone_number ~ '^\+?[1-9]\d{9,14}$')
+            );
+            GRANT CONNECT ON DATABASE profiles_db TO service_user;
+            GRANT USAGE ON SCHEMA profiles TO service_user;
+            GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA profiles TO service_user;
+            ALTER DEFAULT PRIVILEGES IN SCHEMA profiles GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO service_user;
+            `);
+
+        await assertTrue(serviceClient,
+            `SELECT EXISTS(
+                SELECT 1 FROM information_schema.tables
+                WHERE table_schema='profiles' AND table_name='profile_list'
+            ) AS ok`,
+            "profiles.profile_list exists");
+
+
+        await serviceClient.query(`
+            CREATE        INDEX IF NOT EXISTS idx_profile_list_agent_sub ON profiles.profile_list (agent_sub, created_at DESC);
+            CREATE UNIQUE INDEX IF NOT EXISTS ux_profile_list_email_ci_active      ON profiles.profile_list (email)        WHERE deleted_at IS NULL;
+            CREATE UNIQUE INDEX IF NOT EXISTS ux_profile_list_phone_number_active  ON profiles.profile_list (phone_number) WHERE deleted_at IS NULL;
+            CREATE        INDEX IF NOT EXISTS idx_profile_city_state_country       ON profiles.profile_list (country, state, city);
+            `);
+    } catch(e) {
+        console.log("initProfilesDB error: ", e);
+    }
+}
+
+async function initAccountsDB(accountsClient) {
+
+}
 
 async function main() {
     try {
         const secret = await getSecretValue();
-        // const masterPool = await bootstrapPool(secret, 'postgres');
-        // const masterClient = await masterPool.connect();
+        const masterPool = await bootstrapPool(secret, 'postgres');
+        const masterClient = await masterPool.connect();
+        await createDB('admins_db', masterClient);
+        await createDB('agents_db', masterClient);
+        await createDB('profiles_db', masterClient);
         // await masterClient.query(`CREATE DATABASE admins_db`);
         // // await masterClient.query(`
         // //     DO $$
@@ -108,60 +221,63 @@ async function main() {
         // // await masterClient.query(`CREATE DATABASE accounts_db`);
         // // await masterClient.query(`CREATE DATABASE logs_db`);
         // // await masterClient.query(`CREATE DATABASE transactions_db`);
-        // await masterClient.release();
+        await masterClient.release();
         // await masterPool.end();
 
         // Connect to specific DB as bootstrap still
         // Create owner, migrator and user roles for each service
         // const microservices = ['admins', 'agents', 'profiles', 'accounts', 'logs', 'transactions'];
-        const servicePool = await bootstrapPool(secret, 'admins_db');
-        const serviceClient = await servicePool.connect();
-        await serviceClient.query(`
-            DO $$
-            BEGIN
-                IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'service_user') THEN
-                    CREATE ROLE service_user WITH LOGIN PASSWORD 'user_password';
-                END IF;
-            END $$ LANGUAGE plpgsql;
-            `);
-        await serviceClient.query(`CREATE SCHEMA IF NOT EXISTS admins;`);
-        await assertTrue(serviceClient,
-            `SELECT EXISTS(SELECT 1 FROM pg_namespace WHERE nspname='admins') AS ok`,
-            "admins schema exists");
+        // const servicePool = await bootstrapPool(secret, 'admins_db');
+        // const serviceClient = await servicePool.connect();
+        // await serviceClient.query(`
+        //     DO $$
+        //     BEGIN
+        //         IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'service_user') THEN
+        //             CREATE ROLE service_user WITH LOGIN PASSWORD 'user_password';
+        //         END IF;
+        //     END $$ LANGUAGE plpgsql;
+        //     `);
+        // await serviceClient.query(`CREATE SCHEMA IF NOT EXISTS admins;`);
+        // await assertTrue(serviceClient,
+        //     `SELECT EXISTS(SELECT 1 FROM pg_namespace WHERE nspname='admins') AS ok`,
+        //     "admins schema exists");
 
-        await serviceClient.query(`SET search_path TO admins, pg_catalog;`);
-        await serviceClient.query(`
-            CREATE EXTENSION IF NOT EXISTS citext;
-            CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+        // await serviceClient.query(`SET search_path TO admins, pg_catalog;`);
+        // await serviceClient.query(`
+        //     CREATE EXTENSION IF NOT EXISTS citext;
+        //     CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
-            CREATE TABLE IF NOT EXISTS admin_list (
-                id           uuid        PRIMARY KEY NOT NULL,
-                first_name   text        NOT NULL,
-                last_name    text        NOT NULL,
-                email        citext      NOT NULL UNIQUE,
-                role         text        NOT NULL DEFAULT 'admin',
-                created_at   timestamptz NOT NULL DEFAULT now(),
-                updated_at   timestamptz NOT NULL DEFAULT now(),
-                deleted_at   timestamptz,
-                deleted_by   uuid,
-                delete_reason text
-            );
+        //     CREATE TABLE IF NOT EXISTS admin_list (
+        //         id           uuid        PRIMARY KEY NOT NULL,
+        //         first_name   text        NOT NULL,
+        //         last_name    text        NOT NULL,
+        //         email        citext      NOT NULL UNIQUE,
+        //         role         text        NOT NULL DEFAULT 'admin',
+        //         created_at   timestamptz NOT NULL DEFAULT now(),
+        //         updated_at   timestamptz NOT NULL DEFAULT now(),
+        //         deleted_at   timestamptz,
+        //         deleted_by   uuid,
+        //         delete_reason text
+        //     );
 
-            GRANT CONNECT ON DATABASE admins_db TO service_user;
-            GRANT USAGE ON SCHEMA admins TO service_user;
-            GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA admins TO service_user;
-            ALTER DEFAULT PRIVILEGES IN SCHEMA admins GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO service_user;
-            `);
+        //     GRANT CONNECT ON DATABASE admins_db TO service_user;
+        //     GRANT USAGE ON SCHEMA admins TO service_user;
+        //     GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA admins TO service_user;
+        //     ALTER DEFAULT PRIVILEGES IN SCHEMA admins GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO service_user;
+        //     `);
 
-        await assertTrue(serviceClient,
-            `SELECT EXISTS(
-                SELECT 1 FROM information_schema.tables
-                WHERE table_schema='admins' AND table_name='admin_list'
-            ) AS ok`,
-            "admins.admin_list exists");
-
-        await serviceClient.release();
-        await servicePool.end();
+        // await assertTrue(serviceClient,
+        //     `SELECT EXISTS(
+        //         SELECT 1 FROM information_schema.tables
+        //         WHERE table_schema='admins' AND table_name='admin_list'
+        //     ) AS ok`,
+        //     "admins.admin_list exists");
+        const profilesPool = await bootstrapPool(secret, 'profiles_db');
+        const profilesClient = await profilesPool.connect();
+        await initProfilesDB(profilesClient);
+        await profilesClient.release();
+        await profilesPool.end();
+        await masterPool.end();
     } catch (e) {
         if (e.code === "42P04"){
             console.log("admins_db already exists");

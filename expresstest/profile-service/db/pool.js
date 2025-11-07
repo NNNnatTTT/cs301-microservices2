@@ -5,12 +5,12 @@ import {
   GetSecretValueCommand,
 } from "@aws-sdk/client-secrets-manager";
 // import * as secretsClient from "./secrets";
-
+const { Pool } = pg;
 const client = new SecretsManagerClient({
   region: "ap-southeast-1",
 });
 
-const secret_name = "itsatestdb";
+const secret_name = "itsa-db-service-user";
 
 async function initPool() {
   try {
@@ -28,7 +28,7 @@ async function initPool() {
       port: secret.port,
       user: secret.username,
       password: secret.password,
-      database: secret.dbname,
+      database: 'profiles',
       max: 10,
       idleTimeoutMillis: 30000,
       options: '-c search_path=profiles,public',

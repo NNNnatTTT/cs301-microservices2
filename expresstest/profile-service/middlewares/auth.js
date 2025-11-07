@@ -17,7 +17,9 @@ export function requireAuthREAL(req, res, next) {
 
 // (TEST ONLY)
 export function requireAuth(req, _res, next) {
-  req.user = { id: "11111111-1111-1111-1111-111111111111", role: "agent" };
+  // req.user.id = req.user.sub;
+  // req.user = { id: "11111111-1111-1111-1111-111111111111", role: "agent" };
+  req.user = {sub : "24988448-20a1-7025-59a4-e27cbfdd22ef", role: "agent"};
   next();
 }
 

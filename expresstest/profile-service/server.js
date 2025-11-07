@@ -1,6 +1,6 @@
 import express from "express";
 import helmet from "helmet";
-import pool from "./db/pool.js";
+// import pool from "./db/pool.js";
 import profilesRouter from "./routes/profiles.js"; 
 import { requireAuth } from "./middlewares/auth.js";
 
@@ -23,6 +23,7 @@ app.get("/allz", async (_req, res) => {
 
 // Root route
 app.get("/", (_req, res) => res.send("API is running"));
+app.get("/itsa_api_gateway_dev/profile-route", (_req, res) => res.send("API is running"));
 
 // Actual
 app.use("/v1/profile", requireAuth, profilesRouter);

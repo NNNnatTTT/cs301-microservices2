@@ -1,5 +1,5 @@
 import { Router } from "express";
-import pool from "../db/pool.js";
+// import pool from "../db/pool.js";
 import * as profileTX from "../db/tx.js"
 // import { publish } from "../queues/sqs.js";
 import { validate, validateParams, validateQuery } from "../middlewares/validate.js";
@@ -10,15 +10,15 @@ const router = Router();
 
 router.post ("/createProfile", requireAuth, validate(schema.createProfileSchema), async(req, res, next) => {
   try {
-      const agentID = req.user?.id;
+      const agentSUB = req.user?.sub;
 
-      if (!agentID) {
-        return res.status(403).json({ error: "Forbidden", message: "Missing agentID" });
+      if (!agentSUB) {
+        return res.status(403).json({ error: "Forbidden", message: "Missing agentSUB" });
       }
 
       const profileID = await profileTX.createProfile({
         ...req.validated, 
-        agentID,
+        agentSUB,
       });
 
       return res.status(201).json({ profileID });
@@ -27,18 +27,18 @@ router.post ("/createProfile", requireAuth, validate(schema.createProfileSchema)
     }
 });
 
-// /:agentID for param, otherwise blank for query
+// /:agentSUB for param, otherwise blank for query
 router.get ("/findByID", requireAuth, validateQuery(schema.paramID), async(req, res, next) => {
   try {
-      const agentID = req.user?.id;
+      const agentSUB = req.user?.sub;
       const id = req.validatedQuery.id;
 
-      if (!agentID) {
-        return res.status(403).json({ error: "Forbidden", message: "Missing agentID" });
+      if (!agentSUB) {
+        return res.status(403).json({ error: "Forbidden", message: "Missing agentSUB" });
       }
 
-      const client = await profileTX.getProfileByIDagentID({
-        agentID, 
+      const client = await profileTX.getProfileByIDagentSUB({
+        agentSUB, 
         id,
       });
 
@@ -51,16 +51,16 @@ router.get ("/findByID", requireAuth, validateQuery(schema.paramID), async(req, 
 
 router.get ("/all", requireAuth, validateQuery(schema.pageAllClientSchema), async(req, res, next) => {
   try {
-      const agentID = req.user?.id;
-      console.log(agentID);
+      const agentSUB = req.user?.sub;
+      console.log(agentSUB);
 
-      if (!agentID) {
-        return res.status(403).json({ error: "Forbidden", message: "Missing agentID" });
+      if (!agentSUB) {
+        return res.status(403).json({ error: "Forbidden", message: "Missing agentSUB" });
       }
 
-      const clients = await profileTX.getProfilePagesByAgentID({
+      const clients = await profileTX.getProfilePagesByagentSUB({
         ...req.validatedQuery,
-        agentID,
+        agentSUB,
       });
 
       if (!clients || clients.length === 0) return res.status(404).json({ error: "NotFound" });
@@ -126,15 +126,15 @@ router.get ("/strict", requireAuth, validateQuery(schema.getschema), async(req, 
 
 router.get ("/search", requireAuth, validateQuery(schema.searchSchema), async(req, res, next) => {
   try {
-      const agentID = req.user?.id;
+      const agentSUB = req.user?.id;
 
-      if (!agentID) {
-        return res.status(403).json({ error: "Forbidden", message: "Missing agentID" });
+      if (!agentSUB) {
+        return res.status(403).json({ error: "Forbidden", message: "Missing agentSUB" });
       }
 
       const clients = await profileTX.searchProfile({
         ...req.validatedQuery, 
-        agentID,
+        agentSUB,
       });
 
       if (!clients || clients.length === 0) return res.status(404).json({ error: "NotFound" });
@@ -166,16 +166,16 @@ router.get ("/loose", requireAuth, validateQuery(schema.getschema), async(req, r
 
 router.put ("/updateProfile", requireAuth, validateQuery(schema.paramID), validate(schema.updateProfileSchema), async(req, res, next) => {
   try {
-      const agentID = req.user?.id;
+      const agentSUB = req.user?.id;
       const id = req.validatedQuery.id;
 
-      if (!agentID) {
-        return res.status(403).json({ error: "Forbidden", message: "Missing agentID" });
+      if (!agentSUB) {
+        return res.status(403).json({ error: "Forbidden", message: "Missing agentSUB" });
       }
 
       const client = await profileTX.updateProfile({
         ...req.validated, 
-        agentID,
+        agentSUB,
         id
       });
 
@@ -187,15 +187,15 @@ router.put ("/updateProfile", requireAuth, validateQuery(schema.paramID), valida
 
 router.put ("/verifyProfile", requireAuth, validateQuery(schema.paramID), async(req, res, next) => {
   try {
-      const agentID = req.user?.id;
+      const agentSUB = req.user?.id;
       const id = req.validatedQuery.id;
 
-      if (!agentID) {
-        return res.status(403).json({ error: "Forbidden", message: "Missing agentID" });
+      if (!agentSUB) {
+        return res.status(403).json({ error: "Forbidden", message: "Missing agentSUB" });
       }
 
       const profileID = await profileTX.verifyProfile({
-        agentID,
+        agentSUB,
         id
       });
 
@@ -207,16 +207,16 @@ router.put ("/verifyProfile", requireAuth, validateQuery(schema.paramID), async(
 
 router.delete ("/deleteProfile", requireAuth, validateQuery(schema.paramID), validate(schema.softDeleteSchema), async(req, res, next) => {
   try {
-      const agentID = req.user?.id;
+      const agentSUB = req.user?.id;
       const id = req.validatedQuery.id;
 
-      if (!agentID) {
-        return res.status(403).json({ error: "Forbidden", message: "Missing agentID" });
+      if (!agentSUB) {
+        return res.status(403).json({ error: "Forbidden", message: "Missing agentSUB" });
       }
 
       const profileIDRes = await profileTX.softDeleteProfile({
         ...req.validated, 
-        agentID,
+        agentSUB,
         id
       });
 

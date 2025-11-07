@@ -14,6 +14,7 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
+    "@aws-sdk/client-secrets-manager": "^3.926.0",
     "@aws-sdk/client-sqs": "^3.916.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
