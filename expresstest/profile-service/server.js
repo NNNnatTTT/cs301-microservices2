@@ -1,6 +1,6 @@
 import express from "express";
 import helmet from "helmet";
-// import pool from "./db/pool.js";
+import {dbPool} from "./db/pool.js";
 import profilesRouter from "./routes/profiles.js"; 
 import { requireAuth } from "./middlewares/auth.js";
 
@@ -13,11 +13,11 @@ app.use(express.json({ limit: "1mb" }));
 app.get("/healthz", (_req, res) => res.send("ok"));
 app.get("/health", (_req, res) => res.json({ ok: true }));
 app.get("/readyz", async (_req, res) => {
-  try { await pool.query("SELECT 1"); res.send("ready"); }
+  try { await dbPool.query("SELECT 1"); res.send("ready"); }
   catch (e) { res.status(503).send("not ready"); console.log(e)}
 });
 app.get("/allz", async (_req, res) => {
-  try { const agents = await pool.query("SELECT * FROM profiles.profile_list"); res.status(200).json({ agents })}
+  try { const agents = await dbPool.query("SELECT * FROM profiles.profile_list"); res.status(200).json({ agents })}
   catch (e) { res.status(503).send(e); console.log(e)}
 });
 

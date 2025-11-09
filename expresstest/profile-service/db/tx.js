@@ -79,7 +79,7 @@ async function getProfileByID({ id }) {
   }
 }
 // NOT FOR PROD
-async function getAllProfiles({ id }) {
+async function getAllProfiles() {
   const client = await pool.connect();
   try {
     // const selectByIDQuery = `
@@ -88,7 +88,7 @@ async function getAllProfiles({ id }) {
     //   FROM profiles.profile_list
     // `;
 
-    const {rows} = await client.query(profileQuery.devSelectAllQuery, [id]);
+    const {rows} = await client.query(profileQuery.devSelectAllQuery);
     
     return rows || null;
   } catch (e) {

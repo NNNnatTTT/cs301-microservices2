@@ -1,0 +1,44 @@
+{
+  "family": "psql-check-split",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "executionRoleArn": "arn:aws:iam::374925730166:role/itsa-initdb-execution-role",
+  "taskRoleArn": "",
+  "containerDefinitions": [
+    {
+      "name": "psqlcheck",
+      "image": "postgres:16-alpine",
+      "essential": true,
+      "command": [
+        "sh",
+        "-c",
+        "PGPASSWORD=\"$DB_PASSWORD\" psql -h \"$DB_HOST\" -p \"$DB_PORT\" -U \"$DB_USER\" -d \"$DB_NAME\" -c \"SELECT current_database(), current_user, version();\" -c \"SELECT schema_name FROM information_schema.schemata ORDER BY 1;\" -c \"SELECT table_schema, table_name FROM information_schema.tables WHERE table_schema = 'profiles' ORDER BY 1,2;\""
+      ],
+      "secrets": [
+        { "name": "DB_HOST",     "valueFrom": "arn:aws:secretsmanager:ap-southeast-1:374925730166:secret:DB_HOST-DYVfU6" },
+        { "name": "DB_PORT",     "valueFrom": "arn:aws:secretsmanager:ap-southeast-1:374925730166:secret:DB_PORT-s2Qsjq" },
+        { "name": "DB_USER",     "valueFrom": "arn:aws:secretsmanager:ap-southeast-1:374925730166:secret:DB_USER-bKqnOE" },
+        { "name": "DB_PASSWORD", "valueFrom": "arn:aws:secretsmanager:ap-southeast-1:374925730166:secret:DB_PASSWORD-fEBs0i" },
+        { "name": "DB_NAME",     "valueFrom": "arn:aws:secretsmanager:ap-southeast-1:374925730166:secret:DB_NAME-riyEaF" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-region": "ap-southeast-1",
+          "awslogs-group": "/ecs/psql-check",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ]
+}
+
+
+      postgresql://admin:N0l6H86l1OK]0J1pyZ#DY:X~D*MZ@itsa-db.cre6kgj5mk2m.ap-southeast-1.rds.amazonaws.com:5432/postgres?sslmode=require
+      DB_HOST: itsa-db.cre6kgj5mk2m.ap-southeast-1.rds.amazonaws.com
+      DB_PORT: 5432
+      DB_USER: admin_user
+      DB_PASSWORD: N0l6H86l1OK]0J1pyZ:X~D*MZ
+      DB_NAME: itsa-db

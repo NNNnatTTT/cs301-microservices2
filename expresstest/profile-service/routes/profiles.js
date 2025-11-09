@@ -70,7 +70,7 @@ router.get ("/all", requireAuth, validateQuery(schema.pageAllClientSchema), asyn
     }
 });
 
-router.get ("/test/all", requireAuth, async(req, res, next) => {
+router.get ("/dev/all", requireAuth, async(req, res, next) => {
   try {
       // const adminID = req.user?.id;
 
@@ -78,9 +78,9 @@ router.get ("/test/all", requireAuth, async(req, res, next) => {
       //   return res.status(403).json({ error: "Forbidden", message: "Missing adminID" });
       // }
 
-      const agents = await agentTX.getAllAgent({});
+      const agents = await profileTX.getAllProfiles();
 
-      if (!agents || agents.length === 0) return res.status(404).json({ error: "NotFound" });
+      if (!agents || agents.length === 0) return res.status(404).json({ error: "No rows" });
       return res.status(201).json({ agents });
     } catch (e) {
       next(e)
